@@ -1,3 +1,9 @@
+export interface Column<T> {
+  key: string
+  label: string
+  render?: (row: T) => import('react').ReactNode
+}
+
 export interface Page<T> {
   items: T[]
   total: number
