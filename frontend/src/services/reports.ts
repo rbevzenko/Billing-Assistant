@@ -100,22 +100,68 @@ export const reportsService = {
 
   downloadPdf: async (params: ReportParams): Promise<void> => {
     const data = await reportsService.get(params)
-    const fmt = (n: number) =>
-      n.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' руб.'
 
-    const breakdownRows = data.breakdown.flatMap(c => [
-      `<tr style="background:#f5f5f5;font-weight:600">
-        <td colspan="3">${c.client_name}</td>
-        <td style="text-align:right">${c.hours.toFixed(2)}</td>
-        <td style="text-align:right">${fmt(c.amount)}</td>
-      </tr>`,
-      ...c.projects.map(p => `<tr>
-        <td></td>
-        <td colspan="2">${p.project_name} (${p.entries_count} зап.)</td>
-        <td style="text-align:right">${p.hours.toFixed(2)}</td>
-        <td style="text-align:right">${fmt(p.amount)}</td>
-      </tr>`),
-    ]).join('')
+    const allEntries = load<TimeEntry>('time_entries')
+    const projects = load<Project>('projects')
+    const storedProfiles = load<LawyerProfile>('profiles')
+    const activeId = localStorage.getItem('billing_active_profile_id')
+    const profile = (activeId ? storedProfiles.find(p => p.id === Number(activeId)) : null)
+      ?? storedProfiles[0] ?? null
+
+    let entries = allEntries.filter(
+      e => e.date >= params.date_from && e.date <= params.date_to
+    )
+    if (params.client_id) {
+      const ids = new Set(projects.filter(p => p.client_id === params.client_id).map(p => p.id))
+      entries = entries.filter(e => ids.has(e.project_id))
+    }
+    entries.sort((a, b) => a.date.localeCompare(b.date))
+
+    const fmtAmt = (n: number, cur = '₽') =>
+      n.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + '\u00a0' + cur
+
+    const clientRowsHtml = data.breakdown.map(c => {
+      const projRowsHtml = c.projects.map(proj => {
+        const project = projects.find(p => p.id === proj.project_id)
+        const rate = parseFloat(project?.hourly_rate ?? profile?.default_hourly_rate ?? '0')
+        const cur = project?.currency ?? 'RUB'
+        const curSym = cur === 'USD' ? '$' : cur === 'EUR' ? '€' : '₽'
+
+        const projEntries = entries.filter(e => e.project_id === proj.project_id)
+        const entryRowsHtml = projEntries.map(e => {
+          const h = parseFloat(e.duration_hours)
+          const amt = h * rate
+          return `<tr class="entry-row">
+            <td class="td-date">${e.date}</td>
+            <td class="td-desc">${e.description ?? '—'}</td>
+            <td class="td-num">${h.toFixed(2)}</td>
+            <td class="td-num">${rate > 0 ? fmtAmt(amt, curSym) : '—'}</td>
+          </tr>`
+        }).join('')
+
+        return `<tr class="proj-hdr">
+          <td colspan="4">${proj.project_name}&nbsp;<span style="font-weight:400;color:#777">(${proj.entries_count}\u00a0зап.)</span></td>
+        </tr>
+        ${entryRowsHtml}
+        <tr class="proj-total">
+          <td colspan="2" class="td-right">Итого по проекту:</td>
+          <td class="td-num">${proj.hours.toFixed(2)}\u00a0ч</td>
+          <td class="td-num">${rate > 0 ? fmtAmt(proj.amount, curSym) : '—'}</td>
+        </tr>`
+      }).join('')
+
+      return `<tr class="client-hdr">
+        <td colspan="4">${c.client_name}</td>
+      </tr>
+      ${projRowsHtml}
+      <tr class="client-total">
+        <td colspan="2" class="td-right">Итого по клиенту:</td>
+        <td class="td-num">${c.hours.toFixed(2)}\u00a0ч</td>
+        <td class="td-num">${fmtAmt(c.amount)}</td>
+      </tr>`
+    }).join('')
+
+    const sigName = profile?.full_name ?? ''
 
     const html = `<!DOCTYPE html>
 <html lang="ru"><head>
@@ -124,33 +170,54 @@ export const reportsService = {
   <style>
     body{font-family:Arial,sans-serif;padding:40px;color:#222;font-size:13px}
     h1{font-size:20px;margin:0 0 4px}
-    .sub{color:#666;margin-bottom:24px}
+    .sub{color:#666;margin-bottom:6px}
+    .lawyer{color:#444;font-size:12px;margin-bottom:24px}
     table{width:100%;border-collapse:collapse;margin-bottom:24px}
     th{background:#f0f0f0;padding:8px;text-align:left;font-size:12px;border-bottom:2px solid #ccc}
-    td{padding:8px;border-bottom:1px solid #eee}
-    .total{text-align:right;font-size:16px;font-weight:700;margin-bottom:24px}
-    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-    .box{border:1px solid #ddd;border-radius:6px;padding:12px}
+    td{padding:5px 8px;border-bottom:1px solid #eee;font-size:12px}
+    .td-num{text-align:right;white-space:nowrap}
+    .td-right{text-align:right;color:#666}
+    .td-date{color:#555;width:88px}
+    .td-desc{color:#333}
+    .client-hdr td{background:#dbeafe;font-weight:700;font-size:14px;padding:8px}
+    .proj-hdr td{background:#f3f4f6;font-weight:600;font-size:12px;color:#374151;padding:6px 8px}
+    .proj-total td{background:#f9fafb;font-size:12px}
+    .client-total td{background:#dbeafe;font-weight:600;font-size:12px}
+    .entry-row td{font-size:12px}
+    .summary{display:flex;gap:16px;margin-bottom:24px}
+    .box{border:1px solid #ddd;border-radius:6px;padding:12px;flex:1}
     .box-label{font-size:11px;color:#999;margin-bottom:4px}
     .box-value{font-size:18px;font-weight:700}
+    .grand-total{text-align:right;font-size:16px;font-weight:700;margin-bottom:32px}
+    .sig-block{margin-top:48px;display:flex;justify-content:flex-end}
+    .sig-line{text-align:center}
+    .sig-underline{border-top:1px solid #222;width:220px;margin:0 auto}
+    .sig-name{font-size:12px;color:#555;margin-top:6px}
     @media print{body{padding:20px}}
   </style>
 </head><body>
   <h1>Отчёт по работе</h1>
   <div class="sub">${params.date_from} — ${params.date_to}</div>
+  ${sigName ? `<div class="lawyer">${sigName}</div>` : ''}
   <div class="summary">
     <div class="box"><div class="box-label">Всего часов</div><div class="box-value">${data.total_hours.toFixed(2)}</div></div>
-    <div class="box"><div class="box-label">Сумма</div><div class="box-value">${fmt(data.total_amount)}</div></div>
+    <div class="box"><div class="box-label">Сумма (руб.)</div><div class="box-value">${fmtAmt(data.total_amount)}</div></div>
     <div class="box"><div class="box-label">Счетов выставлено</div><div class="box-value">${data.invoice_summary.count_total}</div></div>
   </div>
   <table>
     <thead><tr>
-      <th></th><th colspan="2">Клиент / Проект</th>
+      <th>Дата</th><th>Описание работы</th>
       <th style="text-align:right">Часы</th><th style="text-align:right">Сумма</th>
     </tr></thead>
-    <tbody>${breakdownRows}</tbody>
+    <tbody>${clientRowsHtml}</tbody>
   </table>
-  <div class="total">Итого: ${fmt(data.total_amount)}</div>
+  <div class="grand-total">Итого: ${data.total_hours.toFixed(2)}&nbsp;ч &nbsp;|&nbsp; ${fmtAmt(data.total_amount)}</div>
+  ${sigName ? `<div class="sig-block">
+    <div class="sig-line">
+      <div class="sig-underline"></div>
+      <div class="sig-name">${sigName}</div>
+    </div>
+  </div>` : ''}
 </body></html>`
 
     const win = window.open('', '_blank')

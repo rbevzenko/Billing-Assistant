@@ -38,7 +38,7 @@ const ru = {
     exempt: 'НДС не облагается',
     vat0: 'НДС 0%',
     vat10: 'НДС 10%',
-    vat20: 'НДС 20%',
+    vat22: 'НДС 22%',
   },
   invoice: {
     invoice: 'Счёт',
@@ -106,7 +106,7 @@ const en: typeof ru = {
     exempt: 'VAT exempt',
     vat0: 'VAT 0%',
     vat10: 'VAT 10%',
-    vat20: 'VAT 20%',
+    vat22: 'VAT 22%',
   },
   invoice: {
     invoice: 'Invoice',

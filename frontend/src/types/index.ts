@@ -16,7 +16,7 @@ export type ProjectStatus = 'active' | 'paused' | 'completed'
 export type TimeEntryStatus = 'draft' | 'confirmed' | 'billed'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
 export type Currency = 'RUB' | 'USD' | 'EUR'
-export type VatType = 'none' | 'exempt' | 'vat0' | 'vat10' | 'vat20'
+export type VatType = 'none' | 'exempt' | 'vat0' | 'vat10' | 'vat22'
 export type ProfileType = 'ru' | 'eu'
 export type AppLanguage = 'ru' | 'en'
 
@@ -25,7 +25,7 @@ export const VAT_RATES: Record<VatType, number> = {
   exempt: 0,
   vat0: 0,
   vat10: 0.10,
-  vat20: 0.20,
+  vat22: 0.22,
 }
 
 export interface Client {

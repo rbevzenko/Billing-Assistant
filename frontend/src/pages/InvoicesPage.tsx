@@ -28,7 +28,7 @@ const VAT_OPTIONS: { value: VatType; label: string }[] = [
   { value: 'exempt', label: 'НДС не облагается' },
   { value: 'vat0', label: 'НДС 0%' },
   { value: 'vat10', label: 'НДС 10%' },
-  { value: 'vat20', label: 'НДС 20%' },
+  { value: 'vat22', label: 'НДС 22%' },
 ]
 
 const CURRENCY_OPTIONS: Currency[] = ['RUB', 'USD', 'EUR']
@@ -139,7 +139,7 @@ export function InvoicesPage() {
   }), [confirmedEntries, selectedEntries, projectMap])
 
   const previewSubtotal = previewRows.reduce((s, r) => s + r.amount, 0)
-  const vatRate = createVat === 'vat20' ? 0.20 : createVat === 'vat10' ? 0.10 : 0
+  const vatRate = createVat === 'vat22' ? 0.22 : createVat === 'vat10' ? 0.10 : 0
   const previewVat = previewSubtotal * vatRate
   const previewTotal = previewSubtotal + previewVat
   const sym = CURRENCY_SYMBOL[createCurrency]

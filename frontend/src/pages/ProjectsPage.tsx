@@ -11,7 +11,13 @@ import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { ProjectStatusBadge } from '@/components/ui/Badge'
-import type { Client, Column, Page, Project, ProjectCreate, ProjectStatus } from '@/types'
+import type { Client, Column, Currency, Page, Project, ProjectCreate, ProjectStatus } from '@/types'
+
+const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
+  { value: 'RUB', label: 'RUB ₽' },
+  { value: 'USD', label: 'USD $' },
+  { value: 'EUR', label: 'EUR €' },
+]
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Активный' },
@@ -70,8 +76,14 @@ function ProjectForm({
           required
         />
         <Input ref={nameRef} label="Название *" value={form.name} onChange={set('name')} required />
-        <Input label="Ставка руб/час" type="number" step="0.01" min="0"
+        <Input label="Ставка/час" type="number" step="0.01" min="0"
           value={form.hourly_rate ?? ''} onChange={set('hourly_rate')} />
+        <Select
+          label="Валюта"
+          value={form.currency ?? 'RUB'}
+          onChange={e => setForm(prev => ({ ...prev, currency: e.target.value as Currency }))}
+          options={CURRENCY_OPTIONS}
+        />
         <Select
           label="Статус"
           value={form.status ?? 'active'}
@@ -163,7 +175,7 @@ export function ProjectsPage() {
     { key: 'name', label: 'Название' },
     { key: 'client_id', label: 'Клиент', render: r => clientName(r.client_id) },
     { key: 'status', label: 'Статус', render: r => <ProjectStatusBadge status={r.status} /> },
-    { key: 'hourly_rate', label: 'Ставка руб/ч', render: r => r.hourly_rate ? `${r.hourly_rate} ₽` : '—' },
+    { key: 'hourly_rate', label: 'Ставка/ч', render: r => r.hourly_rate ? `${r.hourly_rate} ${r.currency ?? 'RUB'}` : '—' },
     {
       key: 'actions', label: '', render: r => (
         <div className="table-actions">
@@ -174,7 +186,7 @@ export function ProjectsPage() {
     },
   ]
 
-  const emptyForm: ProjectCreate = { client_id: 0, name: '', status: 'active' }
+  const emptyForm: ProjectCreate = { client_id: 0, name: '', status: 'active', currency: 'RUB' }
 
   return (
     <div>
@@ -223,6 +235,7 @@ export function ProjectsPage() {
             name: editProject.name,
             description: editProject.description,
             hourly_rate: editProject.hourly_rate,
+            currency: editProject.currency ?? 'RUB',
             status: editProject.status,
           } : emptyForm}
           clients={clients}

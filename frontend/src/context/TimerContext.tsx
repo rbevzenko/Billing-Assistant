@@ -10,7 +10,7 @@ interface TimerContextValue {
   projectId: number | null
   elapsed: number // seconds
   startTimer: (projectId: number) => void
-  stopTimer: () => number // returns hours rounded to 0.1
+  stopTimer: () => number // returns hours rounded up to nearest 0.25 (15 min)
 }
 
 const TimerContext = createContext<TimerContextValue>({
@@ -58,7 +58,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     const seconds = stored
       ? Math.floor((Date.now() - stored.startTime) / 1000)
       : elapsed
-    const hours = Math.max(0.1, Math.round((seconds / 3600) * 10) / 10)
+    // Round up to the nearest 15-minute interval (quarter hour)
+    const minutes = seconds / 60
+    const roundedMinutes = Math.ceil(minutes / 15) * 15
+    const hours = Math.max(0.25, roundedMinutes / 60)
     localStorage.removeItem(STORAGE_KEY)
     setStored(null)
     setElapsed(0)

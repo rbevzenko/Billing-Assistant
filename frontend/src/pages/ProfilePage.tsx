@@ -18,7 +18,7 @@ const VAT_OPTIONS: { value: VatType; label: string }[] = [
   { value: 'exempt', label: 'НДС не облагается (ст. 149 НК РФ)' },
   { value: 'vat0', label: 'НДС 0%' },
   { value: 'vat10', label: 'НДС 10%' },
-  { value: 'vat20', label: 'НДС 20%' },
+  { value: 'vat22', label: 'НДС 22%' },
 ]
 
 const LANG_OPTIONS: { value: AppLanguage; label: string }[] = [

@@ -87,7 +87,7 @@ export function InvoiceDetailPage() {
 
   const total = Number(invoice.total_amount)
   const totalHours = invoice.items.reduce((s, i) => s + Number(i.hours), 0)
-  const showVat = invoice.vat_type === 'vat10' || invoice.vat_type === 'vat20'
+  const showVat = invoice.vat_type === 'vat10' || invoice.vat_type === 'vat22'
   const vatLabel = T.vat[invoice.vat_type]
 
   const isEu = profile?.type === 'eu'
