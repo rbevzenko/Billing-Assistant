@@ -15,6 +15,18 @@ export interface Page<T> {
 export type ProjectStatus = 'active' | 'paused' | 'completed'
 export type TimeEntryStatus = 'draft' | 'confirmed' | 'billed'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
+export type Currency = 'RUB' | 'USD' | 'EUR'
+export type VatType = 'none' | 'exempt' | 'vat0' | 'vat10' | 'vat20'
+export type ProfileType = 'ru' | 'eu'
+export type AppLanguage = 'ru' | 'en'
+
+export const VAT_RATES: Record<VatType, number> = {
+  none: 0,
+  exempt: 0,
+  vat0: 0,
+  vat10: 0.10,
+  vat20: 0.20,
+}
 
 export interface Client {
   id: number
@@ -54,7 +66,7 @@ export interface Project {
   name: string
   description: string | null
   hourly_rate: string | null
-  currency: string
+  currency: Currency
   status: ProjectStatus
   created_at: string
 }
@@ -74,7 +86,7 @@ export interface ProjectCreate {
   name: string
   description?: string | null
   hourly_rate?: string | null
-  currency?: string
+  currency?: Currency
   status?: ProjectStatus
 }
 
@@ -110,7 +122,6 @@ export interface InvoiceItem {
   hours: string
   rate: string
   amount: string
-  // enriched from linked time entry
   date: string | null
   project_name: string | null
   description: string | null
@@ -119,6 +130,7 @@ export interface InvoiceItem {
 export interface Invoice {
   id: number
   client_id: number
+  profile_id: number
   invoice_number: string
   issue_date: string
   due_date: string
@@ -126,15 +138,26 @@ export interface Invoice {
   notes: string | null
   created_at: string
   items: InvoiceItem[]
+  currency: Currency
+  vat_type: VatType
+  subtotal: string
+  vat_amount: string
   total_amount: string
+  payment_currency?: Currency
+  exchange_rate?: number
+  payment_amount?: string
 }
 
 export interface InvoiceCreate {
   client_id: number
+  profile_id: number
   time_entry_ids: number[]
   issue_date: string
   due_date: string
   notes?: string | null
+  currency?: Currency
+  vat_type?: VatType
+  payment_currency?: Currency
 }
 
 export interface InvoiceUpdate {
@@ -143,36 +166,36 @@ export interface InvoiceUpdate {
   notes?: string | null
 }
 
+// ── Lawyer Profile ────────────────────────────────────────────────────────────
+
 export interface LawyerProfile {
   id: number
+  label: string
+  type: ProfileType
+  language: AppLanguage
   full_name: string
   company_name: string
-  inn: string
   address: string
-  bank_name: string
-  bik: string
-  checking_account: string
-  correspondent_account: string
   email: string
   phone: string
   default_hourly_rate: string
+  default_currency: Currency
+  vat_type: VatType
   logo_path: string | null
+  // Russian bank
+  inn?: string
+  bank_name?: string
+  bik?: string
+  checking_account?: string
+  correspondent_account?: string
+  // EU / international
+  iban?: string
+  swift?: string
+  bank_country?: string
+  vat_number?: string
 }
 
-export interface LawyerProfileUpdate {
-  full_name?: string | null
-  company_name?: string | null
-  inn?: string | null
-  address?: string | null
-  bank_name?: string | null
-  bik?: string | null
-  checking_account?: string | null
-  correspondent_account?: string | null
-  email?: string | null
-  phone?: string | null
-  default_hourly_rate?: string | null
-  logo_path?: string | null
-}
+export interface LawyerProfileUpdate extends Partial<Omit<LawyerProfile, 'id'>> {}
 
 export interface BulkConfirmResponse {
   confirmed_count: number
@@ -180,7 +203,7 @@ export interface BulkConfirmResponse {
   skipped_ids: number[]
 }
 
-// ── Dashboard ──────────────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export interface DashboardRecentEntry {
   id: number
@@ -203,6 +226,7 @@ export interface DashboardRecentInvoice {
   due_date: string
   status: InvoiceStatus
   total_amount: number
+  currency: Currency
 }
 
 export interface DashboardData {

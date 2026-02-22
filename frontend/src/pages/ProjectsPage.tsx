@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
 import { useToast } from '@/context/ToastContext'
@@ -31,6 +32,7 @@ function ProjectForm({
   onCancel: () => void
   loading: boolean
 }) {
+  const navigate = useNavigate()
   const [form, setForm] = useState<ProjectCreate>(initial)
   const nameRef = useRef<HTMLInputElement>(null)
 
@@ -41,6 +43,20 @@ function ProjectForm({
   const set = (field: keyof ProjectCreate) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(prev => ({ ...prev, [field]: e.target.value }))
+
+  if (clients.length === 0) {
+    return (
+      <div style={{ padding: '16px 0' }}>
+        <p style={{ marginBottom: 12 }}>Сначала создайте хотя бы одного клиента.</p>
+        <div className="modal-actions">
+          <Button type="button" variant="secondary" onClick={onCancel}>Отмена</Button>
+          <Button type="button" onClick={() => { onCancel(); navigate('/clients') }}>
+            Перейти к клиентам
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={e => { e.preventDefault(); onSave(form) }}>

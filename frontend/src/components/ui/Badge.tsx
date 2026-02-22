@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/translations'
 import type { ProjectStatus, InvoiceStatus, TimeEntryStatus } from '@/types'
 
 type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple'
@@ -11,36 +12,39 @@ export function Badge({ variant = 'neutral', children }: BadgeProps) {
   return <span className={`badge badge-${variant}`}>{children}</span>
 }
 
-const PROJECT_STATUS_MAP: Record<ProjectStatus, { variant: BadgeVariant; label: string }> = {
-  active: { variant: 'success', label: 'Активный' },
-  paused: { variant: 'warning', label: 'Приостановлен' },
-  completed: { variant: 'info', label: 'Завершён' },
+const PROJECT_STATUS_MAP: Record<ProjectStatus, { variant: BadgeVariant; ru: string; en: string }> = {
+  active:    { variant: 'success',  ru: 'Активный',      en: 'Active' },
+  paused:    { variant: 'warning',  ru: 'Приостановлен', en: 'On hold' },
+  completed: { variant: 'info',     ru: 'Завершён',      en: 'Completed' },
 }
 
-const TIME_STATUS_MAP: Record<TimeEntryStatus, { variant: BadgeVariant; label: string }> = {
-  draft: { variant: 'neutral', label: 'Черновик' },
-  confirmed: { variant: 'success', label: 'Подтверждён' },
-  billed: { variant: 'purple', label: 'Выставлен' },
+const TIME_STATUS_MAP: Record<TimeEntryStatus, { variant: BadgeVariant; ru: string; en: string }> = {
+  draft:     { variant: 'neutral', ru: 'Черновик',    en: 'Draft' },
+  confirmed: { variant: 'success', ru: 'Подтверждён', en: 'Confirmed' },
+  billed:    { variant: 'purple',  ru: 'Выставлен',   en: 'Billed' },
 }
 
-const INVOICE_STATUS_MAP: Record<InvoiceStatus, { variant: BadgeVariant; label: string }> = {
-  draft: { variant: 'neutral', label: 'Черновик' },
-  sent: { variant: 'warning', label: 'Отправлен' },
-  paid: { variant: 'success', label: 'Оплачен' },
-  overdue: { variant: 'danger', label: 'Просрочен' },
+const INVOICE_STATUS_MAP: Record<InvoiceStatus, { variant: BadgeVariant; ru: string; en: string }> = {
+  draft:   { variant: 'neutral', ru: 'Черновик',  en: 'Draft' },
+  sent:    { variant: 'warning', ru: 'Отправлен', en: 'Sent' },
+  paid:    { variant: 'success', ru: 'Оплачен',   en: 'Paid' },
+  overdue: { variant: 'danger',  ru: 'Просрочен', en: 'Overdue' },
 }
 
 export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
-  const { variant, label } = PROJECT_STATUS_MAP[status]
-  return <Badge variant={variant}>{label}</Badge>
+  const { lang } = useLanguage()
+  const { variant, ru, en } = PROJECT_STATUS_MAP[status]
+  return <Badge variant={variant}>{lang === 'en' ? en : ru}</Badge>
 }
 
 export function TimeStatusBadge({ status }: { status: TimeEntryStatus }) {
-  const { variant, label } = TIME_STATUS_MAP[status]
-  return <Badge variant={variant}>{label}</Badge>
+  const { lang } = useLanguage()
+  const { variant, ru, en } = TIME_STATUS_MAP[status]
+  return <Badge variant={variant}>{lang === 'en' ? en : ru}</Badge>
 }
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
-  const { variant, label } = INVOICE_STATUS_MAP[status]
-  return <Badge variant={variant}>{label}</Badge>
+  const { lang } = useLanguage()
+  const { variant, ru, en } = INVOICE_STATUS_MAP[status]
+  return <Badge variant={variant}>{lang === 'en' ? en : ru}</Badge>
 }

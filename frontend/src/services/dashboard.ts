@@ -87,6 +87,7 @@ export const dashboardService = {
           client_id: inv.client_id,
           client_name: client?.name ?? '—',
           issue_date: inv.issue_date,
+          currency: inv.currency ?? 'RUB',
           due_date: inv.due_date,
           status: inv.status,
           total_amount: parseFloat(inv.total_amount),
