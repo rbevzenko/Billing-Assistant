@@ -29,4 +29,16 @@ export const invoicesService = {
 
   pay: (id: number) =>
     api.post<Invoice>(`/invoices/${id}/pay`).then(r => r.data),
+
+  downloadPdf: async (id: number, invoiceNumber: string) => {
+    const response = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' })
+    const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${invoiceNumber}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  },
 }
