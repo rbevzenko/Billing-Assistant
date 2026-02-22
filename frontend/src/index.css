@@ -645,6 +645,266 @@ input, select, textarea { font-family: inherit; }
   margin-left: auto;
 }
 
+/* ── Overdue rows ─────────────────────────────────────────────────────────── */
+tr.row-overdue td {
+  background: #fff5f5 !important;
+}
+
+.overdue-date {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.overdue-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #fee2e2;
+  color: var(--danger);
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.invoice-num {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ── Create invoice modal ─────────────────────────────────────────────────── */
+.create-entries-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.check-all-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.entry-check-selected {
+  background: var(--primary-light) !important;
+}
+
+.entry-check-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.entry-check-project {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.entry-check-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry-check-hours {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.entry-check-amount {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.create-no-entries {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+.invoice-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.invoice-preview .table th,
+.invoice-preview .table td {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* ── Invoice detail page ──────────────────────────────────────────────────── */
+.invoice-detail {
+  max-width: 900px;
+}
+
+.invoice-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.invoice-doc {
+  padding: 0;
+}
+
+.invoice-doc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-doc-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.invoice-doc-dates {
+  display: flex;
+  gap: 28px;
+  text-align: right;
+}
+
+.invoice-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-party {
+  padding: 20px 28px;
+}
+
+.invoice-party:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.invoice-party-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.invoice-party-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.invoice-party-row {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.invoice-party-bank {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.invoice-notes {
+  padding: 12px 28px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-notes-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.invoice-doc-footer {
+  padding: 20px 28px;
+  border-top: 2px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoice-total-block {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.invoice-total-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.invoice-total-sum {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  .no-print,
+  .sidebar,
+  .header,
+  .pagination,
+  .toast-container {
+    display: none !important;
+  }
+
+  .main {
+    margin-left: 0 !important;
+  }
+
+  .page {
+    padding: 8px !important;
+  }
+
+  .invoice-detail {
+    max-width: 100%;
+  }
+
+  .invoice-doc {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .table tbody tr:hover {
+    background: transparent !important;
+  }
+
+  body {
+    background: white !important;
+  }
+}
+
 /* ── Timer ────────────────────────────────────────────────────────────────── */
 .timer-display {
   display: flex;

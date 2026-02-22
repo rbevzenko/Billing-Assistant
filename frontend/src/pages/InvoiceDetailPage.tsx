@@ -1,25 +1,50 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { invoicesService } from '@/services/invoices'
+import { clientsService } from '@/services/clients'
+import { profileService } from '@/services/profile'
 import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InvoiceStatusBadge } from '@/components/ui/Badge'
-import type { Invoice } from '@/types'
+import type { Client, Invoice, LawyerProfile } from '@/types'
+
+function fmt(n: string | number) {
+  return Number(n).toLocaleString('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function fmtDate(s: string) {
+  return new Date(s + 'T00:00:00').toLocaleDateString('ru-RU')
+}
 
 export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addToast } = useToast()
+
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [client, setClient] = useState<Client | null>(null)
+  const [profile, setProfile] = useState<LawyerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
   useEffect(() => {
     if (!id) return
+    setLoading(true)
     invoicesService.get(Number(id))
-      .then(setInvoice)
+      .then(async inv => {
+        setInvoice(inv)
+        const [cl, pr] = await Promise.all([
+          clientsService.get(inv.client_id),
+          profileService.get(),
+        ])
+        setClient(cl)
+        setProfile(pr)
+      })
       .catch(() => addToast('error', 'Счёт не найден'))
       .finally(() => setLoading(false))
   }, [id, addToast])
@@ -28,9 +53,8 @@ export function InvoiceDetailPage() {
     if (!invoice) return
     setActionLoading(true)
     try {
-      const updated = await invoicesService.send(invoice.id)
-      setInvoice(updated)
-      addToast('success', 'Счёт отправлен')
+      setInvoice(await invoicesService.send(invoice.id))
+      addToast('success', 'Статус изменён: Отправлен')
     } catch {
       addToast('error', 'Ошибка')
     } finally {
@@ -42,9 +66,8 @@ export function InvoiceDetailPage() {
     if (!invoice) return
     setActionLoading(true)
     try {
-      const updated = await invoicesService.pay(invoice.id)
-      setInvoice(updated)
-      addToast('success', 'Счёт отмечен как оплаченный')
+      setInvoice(await invoicesService.pay(invoice.id))
+      addToast('success', 'Статус изменён: Оплачен')
     } catch {
       addToast('error', 'Ошибка')
     } finally {
@@ -69,93 +92,196 @@ export function InvoiceDetailPage() {
   if (!invoice) return <div className="loading-text">Счёт не найден</div>
 
   const total = Number(invoice.total_amount)
+  const totalHours = invoice.items.reduce((s, i) => s + Number(i.hours), 0)
 
   return (
-    <div style={{ maxWidth: 800 }}>
-      {/* Header card */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-header">
+    <div className="invoice-detail">
+      {/* ── Action bar (hidden on print) ────────────────────────────────────── */}
+      <div className="invoice-action-bar no-print">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')}>
+          ← Назад
+        </Button>
+        <div className="table-actions">
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>
+            ⬇ Скачать PDF
+          </Button>
+          {invoice.status === 'draft' && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSend}
+                loading={actionLoading}
+              >
+                Отправлен ✓
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>
+                Удалить
+              </Button>
+            </>
+          )}
+          {invoice.status === 'sent' && (
+            <Button variant="primary" size="sm" onClick={handlePay} loading={actionLoading}>
+              Оплачен ✓
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Invoice document ────────────────────────────────────────────────── */}
+      <div className="card invoice-doc" id="invoice-print-area">
+        {/* Header: number + status */}
+        <div className="invoice-doc-header">
           <div>
-            <h2 className="card-title">{invoice.invoice_number}</h2>
-            <div style={{ marginTop: 4 }}>
+            <h1 className="invoice-doc-title">Счёт {invoice.invoice_number}</h1>
+            <div style={{ marginTop: 6 }}>
               <InvoiceStatusBadge status={invoice.status} />
             </div>
           </div>
-          <div className="table-actions">
-            {invoice.status === 'draft' && (
-              <>
-                <Button variant="secondary" size="sm" onClick={handleSend} loading={actionLoading}>
-                  Отправить
-                </Button>
-                <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>
-                  Удалить
-                </Button>
-              </>
-            )}
-            {invoice.status === 'sent' && (
-              <Button variant="primary" size="sm" onClick={handlePay} loading={actionLoading}>
-                Отметить оплаченным
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')}>
-              ← Назад
-            </Button>
+          <div className="invoice-doc-dates">
+            <div className="invoice-meta-item">
+              <span className="invoice-meta-label">Дата выставления</span>
+              <span>{fmtDate(invoice.issue_date)}</span>
+            </div>
+            <div className="invoice-meta-item">
+              <span className="invoice-meta-label">Срок оплаты</span>
+              <span>{fmtDate(invoice.due_date)}</span>
+            </div>
           </div>
         </div>
 
-        <div className="invoice-meta">
-          <div className="invoice-meta-item">
-            <span className="invoice-meta-label">Дата выставления</span>
-            <span>{invoice.issue_date}</span>
+        {/* Parties: lawyer ↔ client */}
+        <div className="invoice-parties">
+          <div className="invoice-party">
+            <div className="invoice-party-label">Исполнитель</div>
+            {profile ? (
+              <>
+                <div className="invoice-party-name">
+                  {profile.company_name || profile.full_name}
+                </div>
+                {profile.company_name && profile.full_name && (
+                  <div className="invoice-party-row">{profile.full_name}</div>
+                )}
+                {profile.inn && (
+                  <div className="invoice-party-row">ИНН: {profile.inn}</div>
+                )}
+                {profile.address && (
+                  <div className="invoice-party-row">{profile.address}</div>
+                )}
+                {profile.phone && (
+                  <div className="invoice-party-row">{profile.phone}</div>
+                )}
+                {profile.email && (
+                  <div className="invoice-party-row">{profile.email}</div>
+                )}
+                {(profile.bank_name || profile.bik || profile.checking_account) && (
+                  <div className="invoice-party-bank">
+                    {profile.bank_name && <div>{profile.bank_name}</div>}
+                    {profile.bik && <div>БИК: {profile.bik}</div>}
+                    {profile.checking_account && (
+                      <div>Р/с: {profile.checking_account}</div>
+                    )}
+                    {profile.correspondent_account && (
+                      <div>К/с: {profile.correspondent_account}</div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="invoice-party-row" style={{ color: 'var(--text-muted)' }}>
+                Профиль не заполнен
+              </div>
+            )}
           </div>
-          <div className="invoice-meta-item">
-            <span className="invoice-meta-label">Срок оплаты</span>
-            <span>{invoice.due_date}</span>
-          </div>
-          <div className="invoice-meta-item">
-            <span className="invoice-meta-label">Создан</span>
-            <span>{new Date(invoice.created_at).toLocaleDateString('ru-RU')}</span>
+
+          <div className="invoice-party">
+            <div className="invoice-party-label">Заказчик</div>
+            {client ? (
+              <>
+                <div className="invoice-party-name">{client.name}</div>
+                {client.contact_person && (
+                  <div className="invoice-party-row">{client.contact_person}</div>
+                )}
+                {client.inn && (
+                  <div className="invoice-party-row">ИНН: {client.inn}</div>
+                )}
+                {client.address && (
+                  <div className="invoice-party-row">{client.address}</div>
+                )}
+                {client.phone && (
+                  <div className="invoice-party-row">{client.phone}</div>
+                )}
+                {client.email && (
+                  <div className="invoice-party-row">{client.email}</div>
+                )}
+                {(client.bank_name || client.bik || client.checking_account) && (
+                  <div className="invoice-party-bank">
+                    {client.bank_name && <div>{client.bank_name}</div>}
+                    {client.bik && <div>БИК: {client.bik}</div>}
+                    {client.checking_account && (
+                      <div>Р/с: {client.checking_account}</div>
+                    )}
+                    {client.correspondent_account && (
+                      <div>К/с: {client.correspondent_account}</div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="invoice-party-row" style={{ color: 'var(--text-muted)' }}>
+                Загрузка...
+              </div>
+            )}
           </div>
         </div>
 
         {invoice.notes && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--color-bg)', borderRadius: 6 }}>
-            <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>Примечания: </span>
-            {invoice.notes}
+          <div className="invoice-notes">
+            <span className="invoice-notes-label">Примечания:</span> {invoice.notes}
           </div>
         )}
-      </div>
 
-      {/* Items table */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">Позиции счёта</h3>
-        </div>
+        {/* Items table */}
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
+                <th>Дата</th>
+                <th>Проект</th>
+                <th>Описание</th>
                 <th>Часы</th>
-                <th>Ставка (₽/ч)</th>
-                <th>Сумма (₽)</th>
+                <th>Ставка, ₽/ч</th>
+                <th>Сумма, ₽</th>
               </tr>
             </thead>
             <tbody>
-              {invoice.items.map(item => (
+              {invoice.items.map((item, idx) => (
                 <tr key={item.id}>
-                  <td>{item.hours} ч</td>
-                  <td>{Number(item.rate).toLocaleString('ru-RU')}</td>
-                  <td>{Number(item.amount).toLocaleString('ru-RU')}</td>
+                  <td>{item.date ? fmtDate(item.date) : `Позиция ${idx + 1}`}</td>
+                  <td>{item.project_name ?? '—'}</td>
+                  <td className="td-desc">{item.description ?? '—'}</td>
+                  <td className="td-num">{Number(item.hours).toFixed(1)}</td>
+                  <td className="td-num">{fmt(item.rate)}</td>
+                  <td className="td-num">{fmt(item.amount)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="table-total-row">
-                <td colSpan={2}><strong>Итого</strong></td>
-                <td><strong>{total.toLocaleString('ru-RU')} ₽</strong></td>
+                <td colSpan={3} className="total-label">Итого:</td>
+                <td className="td-num total-value">{totalHours.toFixed(1)} ч</td>
+                <td />
+                <td className="td-num total-value">{fmt(total)} ₽</td>
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <div className="invoice-doc-footer">
+          <div className="invoice-total-block">
+            <span className="invoice-total-label">ИТОГО К ОПЛАТЕ:</span>
+            <span className="invoice-total-sum">{fmt(total)} ₽</span>
+          </div>
         </div>
       </div>
 
@@ -164,7 +290,7 @@ export function InvoiceDetailPage() {
         onClose={() => setShowDelete(false)}
         onConfirm={handleDelete}
         title="Удалить счёт"
-        message={`Вы уверены, что хотите удалить счёт ${invoice.invoice_number}? Записи времени вернутся в статус «Подтверждён».`}
+        message={`Удалить счёт ${invoice.invoice_number}? Записи времени вернутся в статус «Подтверждён».`}
         loading={actionLoading}
       />
     </div>

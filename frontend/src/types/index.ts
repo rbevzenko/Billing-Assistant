@@ -104,6 +104,10 @@ export interface InvoiceItem {
   hours: string
   rate: string
   amount: string
+  // enriched from linked time entry
+  date: string | null
+  project_name: string | null
+  description: string | null
 }
 
 export interface Invoice {

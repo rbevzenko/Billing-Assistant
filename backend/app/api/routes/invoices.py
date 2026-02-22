@@ -18,7 +18,11 @@ from app.schemas.invoice import InvoiceCreateRequest, InvoiceRead, InvoiceUpdate
 
 router = APIRouter()
 
-_LOAD_ITEMS = selectinload(Invoice.items)
+_LOAD_ITEMS = (
+    selectinload(Invoice.items)
+    .selectinload(InvoiceItem.time_entry)
+    .selectinload(TimeEntry.project)
+)
 
 
 def _get_or_404(invoice_id: int, db: Session) -> Invoice:

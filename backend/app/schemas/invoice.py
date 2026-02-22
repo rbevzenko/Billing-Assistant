@@ -15,7 +15,32 @@ class InvoiceItemRead(BaseModel):
     rate: Decimal
     amount: Decimal
 
+    # Enriched from linked TimeEntry + Project (nullable for manual items)
+    date: date | None = None
+    project_name: str | None = None
+    description: str | None = None
+
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _pull_time_entry_fields(cls, v: object) -> object:
+        """Pull date/project_name/description from ORM relationships."""
+        if not hasattr(v, "time_entry"):
+            return v
+        te = getattr(v, "time_entry", None)
+        if te is None:
+            return v
+        return {
+            "id": v.id,  # type: ignore[union-attr]
+            "time_entry_id": v.time_entry_id,  # type: ignore[union-attr]
+            "hours": v.hours,  # type: ignore[union-attr]
+            "rate": v.rate,  # type: ignore[union-attr]
+            "amount": v.amount,  # type: ignore[union-attr]
+            "date": te.date,
+            "description": te.description,
+            "project_name": te.project.name if te.project is not None else None,
+        }
 
 
 class InvoiceRead(BaseModel):
