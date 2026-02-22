@@ -645,6 +645,103 @@ input, select, textarea { font-family: inherit; }
   margin-left: auto;
 }
 
+/* ── Timer ────────────────────────────────────────────────────────────────── */
+.timer-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+}
+
+.timer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.timer-clock {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #c2410c;
+  letter-spacing: 0.05em;
+}
+
+.timer-project {
+  font-size: 13px;
+  color: #9a3412;
+  border-left: 1px solid #fed7aa;
+  padding-left: 10px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Quick form actions ────────────────────────────────────────────────────── */
+.quick-form-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+
+/* ── Table checkbox column ────────────────────────────────────────────────── */
+.col-check {
+  width: 40px;
+  padding-left: 16px !important;
+  padding-right: 4px !important;
+}
+
+.col-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.td-desc {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.td-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Selected row ─────────────────────────────────────────────────────────── */
+tr.row-selected td {
+  background: var(--primary-light) !important;
+}
+
+/* ── Totals footer ────────────────────────────────────────────────────────── */
+.total-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.total-value {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
 /* ── Misc ─────────────────────────────────────────────────────────────────── */
 .loading-text {
   text-align: center;
