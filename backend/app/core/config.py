@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://frontend:3000",
+        "https://rbevzenko.github.io",
     ]
 
     class Config:
