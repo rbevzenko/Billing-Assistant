@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
 import { useToast } from '@/context/ToastContext'
@@ -32,6 +32,11 @@ function ProjectForm({
   loading: boolean
 }) {
   const [form, setForm] = useState<ProjectCreate>(initial)
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    nameRef.current?.focus()
+  }, [])
 
   const set = (field: keyof ProjectCreate) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -48,7 +53,7 @@ function ProjectForm({
           placeholder="Выберите клиента"
           required
         />
-        <Input label="Название *" value={form.name} onChange={set('name')} required />
+        <Input ref={nameRef} label="Название *" value={form.name} onChange={set('name')} required />
         <Input label="Ставка руб/час" type="number" step="0.01" min="0"
           value={form.hourly_rate ?? ''} onChange={set('hourly_rate')} />
         <Select
@@ -114,8 +119,8 @@ export function ProjectsPage() {
       setShowForm(false)
       setEditProject(null)
       load()
-    } catch {
-      addToast('error', 'Ошибка сохранения')
+    } catch (err: any) {
+      addToast('error', err.message || 'Ошибка сохранения')
     } finally {
       setFormLoading(false)
     }
@@ -129,8 +134,8 @@ export function ProjectsPage() {
       addToast('success', 'Проект удалён')
       setDeleteProject(null)
       load()
-    } catch {
-      addToast('error', 'Не удалось удалить проект')
+    } catch (err: any) {
+      addToast('error', err.message || 'Не удалось удалить проект')
     } finally {
       setDeleteLoading(false)
     }
@@ -185,7 +190,7 @@ export function ProjectsPage() {
           data={data?.items ?? []}
           keyExtractor={r => r.id}
           loading={loading}
-          emptyMessage="Проекты не найдены"
+          emptyMessage="Проекты не найдены. Нажмите «+ Добавить проект» чтобы начать."
         />
         <Pagination page={page} pages={data?.pages ?? 0} total={data?.total ?? 0} onPageChange={setPage} />
       </div>
@@ -216,7 +221,7 @@ export function ProjectsPage() {
         onClose={() => setDeleteProject(null)}
         onConfirm={handleDelete}
         title="Удалить проект"
-        message={`Вы уверены, что хотите удалить проект «${deleteProject?.name}»?`}
+        message={`Удалить проект «${deleteProject?.name}»? Все записи времени этого проекта будут удалены.`}
         loading={deleteLoading}
       />
     </div>

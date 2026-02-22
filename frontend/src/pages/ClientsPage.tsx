@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { clientsService } from '@/services/clients'
 import { useToast } from '@/context/ToastContext'
 import { Table } from '@/components/ui/Table'
@@ -27,6 +27,11 @@ function ClientForm({
   loading: boolean
 }) {
   const [form, setForm] = useState<ClientCreate>(initial)
+  const firstRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    firstRef.current?.focus()
+  }, [])
 
   const set = (field: keyof ClientCreate) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -35,7 +40,7 @@ function ClientForm({
   return (
     <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
       <div className="form-grid">
-        <Input label="Название *" value={form.name} onChange={set('name')} required />
+        <Input ref={firstRef} label="Название *" value={form.name} onChange={set('name')} required />
         <Input label="Контактное лицо" value={form.contact_person ?? ''} onChange={set('contact_person')} />
         <Input label="Email" type="email" value={form.email ?? ''} onChange={set('email')} />
         <Input label="Телефон" value={form.phone ?? ''} onChange={set('phone')} />
@@ -93,8 +98,8 @@ export function ClientsPage() {
       setShowForm(false)
       setEditClient(null)
       load()
-    } catch {
-      addToast('error', 'Ошибка сохранения')
+    } catch (err: any) {
+      addToast('error', err.message || 'Ошибка сохранения')
     } finally {
       setFormLoading(false)
     }
@@ -108,8 +113,8 @@ export function ClientsPage() {
       addToast('success', 'Клиент удалён')
       setDeleteClient(null)
       load()
-    } catch {
-      addToast('error', 'Не удалось удалить клиента')
+    } catch (err: any) {
+      addToast('error', err.message || 'Не удалось удалить клиента')
     } finally {
       setDeleteLoading(false)
     }
@@ -159,7 +164,7 @@ export function ClientsPage() {
           data={data?.items ?? []}
           keyExtractor={r => r.id}
           loading={loading}
-          emptyMessage="Клиенты не найдены"
+          emptyMessage="Клиенты не найдены. Нажмите «+ Добавить клиента» чтобы начать."
         />
         <Pagination
           page={page}
@@ -200,7 +205,7 @@ export function ClientsPage() {
         onClose={() => setDeleteClient(null)}
         onConfirm={handleDelete}
         title="Удалить клиента"
-        message={`Вы уверены, что хотите удалить клиента «${deleteClient?.name}»?`}
+        message={`Вы уверены, что хотите удалить клиента «${deleteClient?.name}»? Это действие нельзя отменить.`}
         loading={deleteLoading}
       />
     </div>
