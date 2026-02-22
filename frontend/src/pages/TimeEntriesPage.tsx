@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { timeEntriesService } from '@/services/timeEntries'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
@@ -140,8 +140,8 @@ export function TimeEntriesPage() {
       setQHours('')
       setQDesc('')
       load()
-    } catch {
-      addToast('error', 'Ошибка создания записи')
+    } catch (err: any) {
+      addToast('error', err.message || 'Ошибка создания записи')
     } finally {
       setQLoading(false)
     }
@@ -178,8 +178,8 @@ export function TimeEntriesPage() {
       addToast('success', 'Запись обновлена')
       setEditEntry(null)
       load()
-    } catch {
-      addToast('error', 'Ошибка обновления')
+    } catch (err: any) {
+      addToast('error', err.message || 'Ошибка обновления')
     } finally {
       setEditLoading(false)
     }
@@ -218,8 +218,8 @@ export function TimeEntriesPage() {
       addToast('success', 'Запись удалена')
       setDeleteEntry(null)
       load()
-    } catch {
-      addToast('error', 'Не удалось удалить запись')
+    } catch (err: any) {
+      addToast('error', err.message || 'Не удалось удалить запись')
     } finally {
       setDeleteLoading(false)
     }

@@ -34,7 +34,7 @@ const futureDate = (days: number) => {
 }
 
 const isOverdue = (inv: Invoice) =>
-  (inv.status === 'sent' || inv.status === 'draft') && inv.due_date < today()
+  (inv.status === 'sent' || inv.status === 'overdue') && inv.due_date < today()
 
 export function InvoicesPage() {
   const { addToast } = useToast()
@@ -183,8 +183,8 @@ export function InvoicesPage() {
       setShowCreate(false)
       resetCreateForm()
       load()
-    } catch {
-      addToast('error', 'Ошибка создания счёта')
+    } catch (err: any) {
+      addToast('error', err.message || 'Ошибка создания счёта')
     } finally {
       setCreateLoading(false)
     }
