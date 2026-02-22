@@ -6,6 +6,8 @@ from app.api.routes.clients import router as clients_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.time_entries import router as time_entries_router
 from app.api.routes.invoices import router as invoices_router
+from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.reports import router as reports_router
 
 router = APIRouter()
 
@@ -15,3 +17,5 @@ router.include_router(clients_router, prefix="/clients", tags=["Клиенты"]
 router.include_router(projects_router, prefix="/projects", tags=["Проекты"])
 router.include_router(time_entries_router, prefix="/time-entries", tags=["Записи времени"])
 router.include_router(invoices_router, prefix="/invoices", tags=["Счета"])
+router.include_router(dashboard_router, prefix="/dashboard", tags=["Дашборд"])
+router.include_router(reports_router, prefix="/reports", tags=["Отчёты"])

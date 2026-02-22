@@ -173,3 +173,76 @@ export interface BulkConfirmResponse {
   skipped_count: number
   skipped_ids: number[]
 }
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+
+export interface DashboardRecentEntry {
+  id: number
+  date: string
+  project_id: number
+  project_name: string
+  client_id: number
+  client_name: string
+  duration_hours: number
+  description: string | null
+  status: TimeEntryStatus
+}
+
+export interface DashboardRecentInvoice {
+  id: number
+  invoice_number: string
+  client_id: number
+  client_name: string
+  issue_date: string
+  due_date: string
+  status: InvoiceStatus
+  total_amount: number
+}
+
+export interface DashboardData {
+  hours_this_week: number
+  hours_this_month: number
+  unbilled_amount: number
+  unpaid_amount: number
+  overdue_invoices_count: number
+  recent_time_entries: DashboardRecentEntry[]
+  recent_invoices: DashboardRecentInvoice[]
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export interface ProjectBreakdown {
+  project_id: number
+  project_name: string
+  entries_count: number
+  hours: number
+  amount: number
+}
+
+export interface ClientBreakdown {
+  client_id: number
+  client_name: string
+  hours: number
+  amount: number
+  projects: ProjectBreakdown[]
+}
+
+export interface InvoiceSummary {
+  count_total: number
+  count_paid: number
+  count_unpaid: number
+  count_overdue: number
+  total_invoiced: number
+  total_paid: number
+  total_unpaid: number
+}
+
+export interface ReportData {
+  date_from: string
+  date_to: string
+  client_id: number | null
+  total_hours: number
+  total_amount: number
+  breakdown: ClientBreakdown[]
+  invoice_summary: InvoiceSummary
+}
