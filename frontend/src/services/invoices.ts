@@ -17,7 +17,7 @@ function generateInvoiceNumber(invoices: Invoice[]): string {
 
 function calcVat(subtotal: number, vatType: VatType): number {
   const rate = VAT_RATE_MAP[vatType]
-  return vatType === 'vat10' || vatType === 'vat20' ? subtotal * rate : 0
+  return vatType === 'vat10' || vatType === 'vat22' ? subtotal * rate : 0
 }
 
 function printHtml(html: string) {
@@ -29,15 +29,18 @@ function printHtml(html: string) {
   }
 }
 
-function normalize(inv: Partial<Invoice>): Invoice {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalize(inv: any): Invoice {
   const subtotal = inv.subtotal ?? inv.total_amount ?? '0'
+  // migrate old vat20 (20%) stored values to vat22 (22%)
+  const vat_type = (inv.vat_type === 'vat20' ? 'vat22' : inv.vat_type ?? 'none') as VatType
   return {
     profile_id: 1,
     currency: 'RUB',
-    vat_type: 'none',
-    subtotal,
     vat_amount: '0',
     ...inv,
+    vat_type,
+    subtotal,
     total_amount: inv.total_amount ?? subtotal,
   } as Invoice
 }
@@ -191,7 +194,7 @@ export const invoicesService = {
       n.toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const fmt = (amount: string | number) => `${fmtN(typeof amount === 'string' ? parseFloat(amount) : amount)} ${sym}`
 
-    const showVat = invoice.vat_type === 'vat10' || invoice.vat_type === 'vat20'
+    const showVat = invoice.vat_type === 'vat10' || invoice.vat_type === 'vat22'
     const vatLabel = T.vat[invoice.vat_type]
 
     const profileBank = (() => {
@@ -233,6 +236,10 @@ export const invoicesService = {
     .payment-block{text-align:right;font-size:13px;margin-top:8px;color:#555}
     .vat-note{margin-top:12px;font-size:12px;color:#777;font-style:italic}
     .notes{color:#666;font-size:12px;margin-top:16px;border-top:1px solid #eee;padding-top:12px}
+    .signature-block{margin-top:48px;display:flex;justify-content:flex-end}
+    .signature-line{text-align:center}
+    .signature-underline{border-top:1px solid #222;width:220px;margin:0 auto}
+    .signature-name{font-size:12px;color:#555;margin-top:6px}
     @media print{body{padding:20px}}
   </style>
 </head><body>
@@ -290,6 +297,13 @@ export const invoicesService = {
   ` : ''}
   ${!showVat && invoice.vat_type !== 'none' ? `<div class="vat-note">${vatLabel}</div>` : ''}
   ${invoice.notes ? `<div class="notes">${T.invoice.notes}: ${invoice.notes}</div>` : ''}
+  ${profile?.full_name ? `
+  <div class="signature-block">
+    <div class="signature-line">
+      <div class="signature-underline"></div>
+      <div class="signature-name">${profile.full_name}</div>
+    </div>
+  </div>` : ''}
 </body></html>`
 
     printHtml(html)
