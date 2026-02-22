@@ -36,12 +36,12 @@ export async function getRateToRub(currency: Currency): Promise<number> {
   }
 }
 
-/** Returns rate: how many units of `from` per 1 unit of `to`. */
+/** Returns rate: how many `to` per 1 `from` (e.g. getRate('EUR','RUB') ≈ 100). */
 export async function getRate(from: Currency, to: Currency): Promise<number> {
   if (from === to) return 1
   const fromRub = await getRateToRub(from)
   const toRub = await getRateToRub(to)
-  return toRub / fromRub
+  return fromRub / toRub
 }
 
 export function formatCurrency(amount: number, currency: Currency, lang: 'ru' | 'en' = 'ru'): string {
