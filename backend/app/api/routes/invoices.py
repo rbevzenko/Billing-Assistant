@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import PaginationParams
@@ -15,6 +16,13 @@ from app.models.lawyer_profile import LawyerProfile
 from app.models.time_entry import TimeEntry
 from app.schemas.common import Page
 from app.schemas.invoice import InvoiceCreateRequest, InvoiceRead, InvoiceUpdate
+from app.pdf.generator import (
+    render_invoice_pdf,
+    InvoiceData,
+    InvoiceItemData,
+    ProfileData,
+    ClientData,
+)
 
 router = APIRouter()
 
@@ -271,3 +279,99 @@ def pay_invoice(invoice_id: int, db: Session = Depends(get_db)) -> Invoice:
     db.commit()
     db.refresh(invoice)
     return invoice
+
+
+@router.get(
+    "/{invoice_id}/pdf",
+    summary="Скачать счёт в PDF",
+    response_class=Response,
+    responses={
+        200: {"content": {"application/pdf": {}}, "description": "PDF-файл счёта"},
+        404: {"description": "Счёт не найден"},
+    },
+)
+def download_invoice_pdf(invoice_id: int, db: Session = Depends(get_db)) -> Response:
+    invoice = _get_or_404(invoice_id, db)
+
+    client = db.get(Client, invoice.client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+
+    profile = db.query(LawyerProfile).first()
+
+    # Build profile data (use defaults if profile not configured)
+    if profile:
+        profile_data = ProfileData(
+            full_name=profile.full_name,
+            company_name=profile.company_name,
+            inn=profile.inn,
+            address=profile.address,
+            phone=profile.phone,
+            email=profile.email,
+            bank_name=profile.bank_name,
+            bik=profile.bik,
+            checking_account=profile.checking_account,
+            correspondent_account=profile.correspondent_account,
+            logo_path=profile.logo_path,
+        )
+    else:
+        profile_data = ProfileData(
+            full_name="Не указано",
+            company_name="Не указано",
+            inn="",
+            address="",
+            phone="",
+            email="",
+            bank_name="",
+            bik="",
+            checking_account="",
+            correspondent_account="",
+        )
+
+    client_data = ClientData(
+        name=client.name,
+        contact_person=client.contact_person,
+        inn=client.inn,
+        address=client.address,
+        phone=client.phone,
+        email=client.email,
+        bank_name=client.bank_name,
+        bik=client.bik,
+        checking_account=client.checking_account,
+        correspondent_account=client.correspondent_account,
+    )
+
+    items = [
+        InvoiceItemData(
+            date=item.time_entry.date if item.time_entry else None,
+            project_name=item.time_entry.project.name if (item.time_entry and item.time_entry.project) else None,
+            description=item.time_entry.description if item.time_entry else None,
+            hours=item.hours,
+            rate=item.rate,
+            amount=item.amount,
+        )
+        for item in invoice.items
+    ]
+
+    invoice_data = InvoiceData(
+        invoice_number=invoice.invoice_number,
+        issue_date=invoice.issue_date,
+        due_date=invoice.due_date,
+        status=invoice.status.value,
+        notes=invoice.notes,
+        items=items,
+        total_amount=sum(i.amount for i in items),
+    )
+
+    pdf_bytes = render_invoice_pdf(
+        invoice=invoice_data,
+        profile=profile_data,
+        client=client_data,
+    )
+
+    filename = f"{invoice.invoice_number}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

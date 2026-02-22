@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { invoicesService } from '@/services/invoices'
 import { clientsService } from '@/services/clients'
@@ -30,6 +30,7 @@ export function InvoiceDetailPage() {
   const [profile, setProfile] = useState<LawyerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
   useEffect(() => {
@@ -88,6 +89,18 @@ export function InvoiceDetailPage() {
     }
   }
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!invoice) return
+    setPdfLoading(true)
+    try {
+      await invoicesService.downloadPdf(invoice.id, invoice.invoice_number)
+    } catch {
+      addToast('error', 'Ошибка генерации PDF')
+    } finally {
+      setPdfLoading(false)
+    }
+  }, [invoice, addToast])
+
   if (loading) return <div className="loading-text">Загрузка...</div>
   if (!invoice) return <div className="loading-text">Счёт не найден</div>
 
@@ -102,7 +115,7 @@ export function InvoiceDetailPage() {
           ← Назад
         </Button>
         <div className="table-actions">
-          <Button variant="secondary" size="sm" onClick={() => window.print()}>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} loading={pdfLoading}>
             ⬇ Скачать PDF
           </Button>
           {invoice.status === 'draft' && (
