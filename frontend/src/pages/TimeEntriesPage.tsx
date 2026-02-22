@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { timeEntriesService } from '@/services/timeEntries'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
+import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
 import { useToast } from '@/context/ToastContext'
 import { useTimer } from '@/context/TimerContext'
 import { Pagination } from '@/components/ui/Pagination'
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { TimeStatusBadge } from '@/components/ui/Badge'
-import type { Client, Page, Project, TimeEntry, TimeEntryCreate, TimeEntryStatus, TimeEntryUpdate } from '@/types'
+import type { Client, Currency, Page, Project, TimeEntry, TimeEntryCreate, TimeEntryStatus, TimeEntryUpdate } from '@/types'
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Черновик' },
@@ -256,16 +257,34 @@ export function TimeEntriesPage() {
   }
 
   // Page-level totals
-  const totals = useMemo(() => {
+  const [totalCurrency, setTotalCurrency] = useState<Currency>('RUB')
+  const [totalConverted, setTotalConverted] = useState<{ amount: number; loading: boolean }>({ amount: 0, loading: false })
+
+  const totalHours = useMemo(
+    () => (data?.items ?? []).reduce((sum, e) => sum + parseFloat(e.duration_hours), 0),
+    [data],
+  )
+
+  useEffect(() => {
     const items = data?.items ?? []
-    const hours = items.reduce((sum, e) => sum + parseFloat(e.duration_hours), 0)
-    const amount = items.reduce((sum, e) => {
+    // Group raw amounts by project currency
+    const byCurrency = new Map<Currency, number>()
+    for (const e of items) {
       const proj = projectMap.get(e.project_id)
-      const rate = parseFloat(proj?.hourly_rate ?? '0')
-      return sum + parseFloat(e.duration_hours) * rate
-    }, 0)
-    return { hours, amount }
-  }, [data, projectMap])
+      if (!proj?.hourly_rate) continue
+      const hours = parseFloat(e.duration_hours)
+      const cur = (proj.currency ?? 'RUB') as Currency
+      byCurrency.set(cur, (byCurrency.get(cur) ?? 0) + hours * parseFloat(proj.hourly_rate))
+    }
+    if (byCurrency.size === 0) { setTotalConverted({ amount: 0, loading: false }); return }
+
+    setTotalConverted(prev => ({ ...prev, loading: true }))
+    Promise.all(
+      Array.from(byCurrency.entries()).map(async ([cur, amt]) => amt * await getRate(cur, totalCurrency))
+    )
+      .then(amounts => setTotalConverted({ amount: amounts.reduce((s, a) => s + a, 0), loading: false }))
+      .catch(() => setTotalConverted({ amount: 0, loading: false }))
+  }, [data, projectMap, totalCurrency])
 
   const timerProjectName = timer.projectId
     ? (projectMap.get(timer.projectId)?.name ?? '')
@@ -531,15 +550,30 @@ export function TimeEntriesPage() {
                   <td colSpan={5} className="total-label">
                     Итого по странице ({data?.total ?? 0} всего):
                   </td>
-                  <td className="td-num total-value">{totals.hours.toFixed(1)} ч</td>
+                  <td className="td-num total-value">{totalHours.toFixed(1)} ч</td>
                   <td />
                   <td className="td-num total-value">
-                    {totals.amount > 0
-                      ? totals.amount.toLocaleString('ru', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })
-                      : '—'}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                      <div className="lang-switcher" style={{ padding: 0 }}>
+                        {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
+                          <button
+                            key={cur}
+                            className={`lang-btn ${totalCurrency === cur ? 'lang-btn-active' : ''}`}
+                            onClick={() => setTotalCurrency(cur)}
+                            style={{ fontSize: 10, padding: '2px 5px' }}
+                          >
+                            {cur}
+                          </button>
+                        ))}
+                      </div>
+                      <span>
+                        {totalConverted.loading
+                          ? '…'
+                          : totalConverted.amount > 0
+                            ? `${totalConverted.amount.toLocaleString('ru', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SYMBOL[totalCurrency]}`
+                            : '—'}
+                      </span>
+                    </div>
                   </td>
                   <td colSpan={2} />
                 </tr>
