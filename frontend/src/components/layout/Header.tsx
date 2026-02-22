@@ -1,21 +1,13 @@
 import { useLocation } from 'react-router-dom'
-
-const PAGE_TITLES: Record<string, string> = {
-  '/': 'Дашборд',
-  '/time-entries': 'Учёт времени',
-  '/clients': 'Клиенты',
-  '/projects': 'Проекты',
-  '/invoices': 'Счета',
-  '/reports': 'Отчёты',
-  '/profile': 'Профиль',
-}
+import { useLanguage } from '@/i18n/translations'
 
 export function Header() {
   const location = useLocation()
+  const { t } = useLanguage()
   const path = location.pathname
 
-  let title = PAGE_TITLES[path]
-  if (!title && path.startsWith('/invoices/')) title = 'Счёт'
+  let title = t.header[path as keyof typeof t.header]
+  if (!title && path.startsWith('/invoices/')) title = t.header['/invoices/:id']
   if (!title) title = 'Billing Assistant'
 
   return (

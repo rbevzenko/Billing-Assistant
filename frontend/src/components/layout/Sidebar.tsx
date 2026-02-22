@@ -1,15 +1,18 @@
 import { NavLink } from 'react-router-dom'
-
-const NAV_ITEMS = [
-  { to: '/', label: 'Дашборд', icon: '◈', end: true },
-  { to: '/time-entries', label: 'Учёт времени', icon: '◷' },
-  { to: '/clients', label: 'Клиенты', icon: '◉' },
-  { to: '/projects', label: 'Проекты', icon: '◧' },
-  { to: '/invoices', label: 'Счета', icon: '◻' },
-  { to: '/reports', label: 'Отчёты', icon: '◔' },
-] as const
+import { useLanguage } from '@/i18n/translations'
 
 export function Sidebar() {
+  const { lang, setLang, t } = useLanguage()
+
+  const NAV_ITEMS = [
+    { to: '/', label: t.nav.dashboard, icon: '◈', end: true },
+    { to: '/time-entries', label: t.nav.timeEntries, icon: '◷' },
+    { to: '/clients', label: t.nav.clients, icon: '◉' },
+    { to: '/projects', label: t.nav.projects, icon: '◧' },
+    { to: '/invoices', label: t.nav.invoices, icon: '◻' },
+    { to: '/reports', label: t.nav.reports, icon: '◔' },
+  ]
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -37,8 +40,26 @@ export function Sidebar() {
           className={({ isActive }) => `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`}
         >
           <span className="sidebar-link-icon">◍</span>
-          <span>Профиль</span>
+          <span>{t.nav.profile}</span>
         </NavLink>
+
+        {/* Language switcher */}
+        <div className="lang-switcher">
+          <button
+            className={`lang-btn ${lang === 'ru' ? 'lang-btn-active' : ''}`}
+            onClick={() => setLang('ru')}
+            title="Русский"
+          >
+            RU
+          </button>
+          <button
+            className={`lang-btn ${lang === 'en' ? 'lang-btn-active' : ''}`}
+            onClick={() => setLang('en')}
+            title="English"
+          >
+            EN
+          </button>
+        </div>
       </div>
     </aside>
   )
