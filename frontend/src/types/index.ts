@@ -114,6 +114,7 @@ export interface TimeEntryUpdate {
   date?: string
   duration_hours?: number | string
   description?: string | null
+  status?: TimeEntryStatus
 }
 
 export interface InvoiceItem {

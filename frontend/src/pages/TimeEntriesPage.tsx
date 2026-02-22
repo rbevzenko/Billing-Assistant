@@ -166,6 +166,7 @@ export function TimeEntriesPage() {
       date: entry.date,
       duration_hours: entry.duration_hours,
       description: entry.description,
+      status: entry.status,
     })
   }
 
@@ -500,15 +501,13 @@ export function TimeEntriesPage() {
                               Подтвердить
                             </Button>
                           )}
-                          {entry.status !== 'billed' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEdit(entry)}
-                            >
-                              Изм.
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEdit(entry)}
+                          >
+                            Изм.
+                          </Button>
                           {entry.status === 'draft' && (
                             <Button
                               size="sm"
@@ -596,6 +595,20 @@ export function TimeEntriesPage() {
                 setEditForm(p => ({ ...p, description: e.target.value }))
               }
             />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Статус</label>
+            <select
+              className="form-input form-select"
+              value={editForm.status ?? ''}
+              onChange={e =>
+                setEditForm(p => ({ ...p, status: e.target.value as TimeEntryStatus }))
+              }
+            >
+              {STATUS_OPTIONS.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
           </div>
           <div className="modal-actions">
             <Button
