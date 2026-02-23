@@ -234,6 +234,7 @@ export interface DashboardData {
   hours_this_week: number
   hours_this_month: number
   unbilled_amount: number
+  unbilled_by_currency: Partial<Record<Currency, number>>
   unpaid_amount: number
   overdue_invoices_count: number
   recent_time_entries: DashboardRecentEntry[]

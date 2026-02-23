@@ -1,6 +1,6 @@
-import { load, loadOne } from './storage'
+import { load } from './storage'
 import type {
-  Client, DashboardData, DashboardRecentEntry, DashboardRecentInvoice,
+  Client, Currency, DashboardData, DashboardRecentEntry, DashboardRecentInvoice,
   Invoice, LawyerProfile, Project, TimeEntry,
 } from '@/types'
 
@@ -27,7 +27,10 @@ export const dashboardService = {
     const invoices = load<Invoice>('invoices')
     const projects = load<Project>('projects')
     const clients = load<Client>('clients')
-    const profile = loadOne<LawyerProfile>('profile')
+    const storedProfiles = load<LawyerProfile>('profiles')
+    const activeId = localStorage.getItem('billing_active_profile_id')
+    const profile = (activeId ? storedProfiles.find(p => p.id === Number(activeId)) : null)
+      ?? storedProfiles[0] ?? null
 
     const week = weekBounds()
     const month = monthBounds()
@@ -41,12 +44,16 @@ export const dashboardService = {
       .filter(e => e.date >= month.from && e.date <= month.to)
       .reduce((s, e) => s + parseFloat(e.duration_hours), 0)
 
+    const unbilled_by_currency: Partial<Record<Currency, number>> = {}
     const unbilled_amount = entries
       .filter(e => e.status === 'confirmed')
       .reduce((s, e) => {
         const project = projects.find(p => p.id === e.project_id)
         const rate = parseFloat(project?.hourly_rate ?? profile?.default_hourly_rate ?? '0')
-        return s + parseFloat(e.duration_hours) * rate
+        const cur = (project?.currency ?? 'RUB') as Currency
+        const amt = parseFloat(e.duration_hours) * rate
+        unbilled_by_currency[cur] = (unbilled_by_currency[cur] ?? 0) + amt
+        return s + amt
       }, 0)
 
     const unpaid_amount = invoices
@@ -98,6 +105,7 @@ export const dashboardService = {
       hours_this_week,
       hours_this_month,
       unbilled_amount,
+      unbilled_by_currency,
       unpaid_amount,
       overdue_invoices_count,
       recent_time_entries,
