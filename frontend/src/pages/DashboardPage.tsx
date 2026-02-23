@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { dashboardService } from '@/services/dashboard'
-import type { DashboardData, InvoiceStatus, TimeEntryStatus } from '@/types'
+import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
+import type { Currency, DashboardData, InvoiceStatus, TimeEntryStatus } from '@/types'
 
 function fmt(n: number): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
@@ -32,12 +33,24 @@ const STATUS_CLASS: Record<TimeEntryStatus | InvoiceStatus, string> = {
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [unbilledCurrency, setUnbilledCurrency] = useState<Currency>('RUB')
+  const [unbilledConverted, setUnbilledConverted] = useState<{ amount: number; loading: boolean }>({ amount: 0, loading: false })
 
   useEffect(() => {
     dashboardService.get()
       .then(setData)
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!data) return
+    const entries = Object.entries(data.unbilled_by_currency ?? {}) as [Currency, number][]
+    if (entries.length === 0) { setUnbilledConverted({ amount: 0, loading: false }); return }
+    setUnbilledConverted(prev => ({ ...prev, loading: true }))
+    Promise.all(entries.map(async ([cur, amt]) => amt * await getRate(cur, unbilledCurrency)))
+      .then(amounts => setUnbilledConverted({ amount: amounts.reduce((s, a) => s + a, 0), loading: false }))
+      .catch(() => setUnbilledConverted({ amount: 0, loading: false }))
+  }, [data, unbilledCurrency])
 
   if (loading) return <span className="loading-text">Загрузка…</span>
 
@@ -65,8 +78,26 @@ export function DashboardPage() {
         </div>
         <div className="stat-card stat-card--warning">
           <div className="stat-label">Не выставлено счетов</div>
-          <div className="stat-value stat-value--sm">{fmtMoney(data.unbilled_amount)} ₽</div>
-          <div className="stat-sub">подтверждённые записи</div>
+          <div className="stat-value stat-value--sm">
+            {unbilledConverted.loading
+              ? '…'
+              : `${fmtMoney(unbilledConverted.amount)} ${CURRENCY_SYMBOL[unbilledCurrency]}`}
+          </div>
+          <div className="stat-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>подтверждённые</span>
+            <div className="lang-switcher" style={{ padding: 0 }}>
+              {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
+                <button
+                  key={cur}
+                  className={`lang-btn ${unbilledCurrency === cur ? 'lang-btn-active' : ''}`}
+                  onClick={() => setUnbilledCurrency(cur)}
+                  style={{ fontSize: 10, padding: '2px 5px' }}
+                >
+                  {cur}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div className={`stat-card ${data.overdue_invoices_count > 0 ? 'stat-card--danger' : ''}`}>
           <div className="stat-label">Просроченных счетов</div>
