@@ -1,5 +1,5 @@
 import { load, save, nextId, nowISO, paginate } from './storage'
-import { getRateToRub, CURRENCY_SYMBOL } from './exchange'
+import { getRate, CURRENCY_SYMBOL } from './exchange'
 import { VAT_RATES as VAT_RATE_MAP } from '@/types'
 import { TRANSLATIONS } from '@/i18n/translations'
 import type {
@@ -106,9 +106,7 @@ export const invoicesService = {
     let payment_amount: string | undefined
     if (paymentCurrency && paymentCurrency !== currency) {
       try {
-        const fromRub = await getRateToRub(currency)
-        const toRub = await getRateToRub(paymentCurrency)
-        exchange_rate = toRub / fromRub
+        exchange_rate = await getRate(currency, paymentCurrency)
         payment_amount = (totalNum * exchange_rate).toFixed(2)
       } catch {
         // continue without conversion
