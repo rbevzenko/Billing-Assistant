@@ -99,11 +99,9 @@ export function InvoiceDetailPage() {
         <div className="table-actions">
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} loading={pdfLoading}>⬇ Скачать PDF</Button>
           {invoice.status === 'draft' && (
-            <>
-              <Button variant="secondary" size="sm" onClick={handleSend} loading={actionLoading}>Отправлен ✓</Button>
-              <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>Удалить</Button>
-            </>
+            <Button variant="secondary" size="sm" onClick={handleSend} loading={actionLoading}>Отправлен ✓</Button>
           )}
+          <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>Удалить</Button>
           {invoice.status === 'sent' && (
             <Button variant="primary" size="sm" onClick={handlePay} loading={actionLoading}>Оплачен ✓</Button>
           )}
