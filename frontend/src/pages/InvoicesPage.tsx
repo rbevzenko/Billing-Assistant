@@ -9,6 +9,7 @@ import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/ui/Pagination'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InvoiceStatusBadge } from '@/components/ui/Badge'
 import { CURRENCY_SYMBOL } from '@/services/exchange'
 import type {
@@ -69,6 +70,24 @@ export function InvoicesPage() {
   const [notes, setNotes] = useState('')
   const [createLoading, setCreateLoading] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
+
+  const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  const handleDelete = async () => {
+    if (!deleteInvoice) return
+    setDeleteLoading(true)
+    try {
+      await invoicesService.delete(deleteInvoice.id)
+      addToast('success', `Счёт ${deleteInvoice.invoice_number} удалён`)
+      setDeleteInvoice(null)
+      load()
+    } catch {
+      addToast('error', 'Не удалось удалить счёт')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   useEffect(() => {
     clientsService.list({ size: 200 }).then(d => setClients(d.items)).catch(() => {})
@@ -219,7 +238,12 @@ export function InvoicesPage() {
                   </td>
                   <td className="td-num">{fmtAmount(inv)}</td>
                   <td><InvoiceStatusBadge status={inv.status} /></td>
-                  <td><Button size="sm" variant="ghost" onClick={() => navigate(`/invoices/${inv.id}`)}>Открыть →</Button></td>
+                  <td>
+                    <div className="table-actions">
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/invoices/${inv.id}`)}>Открыть →</Button>
+                      <Button size="sm" variant="danger" onClick={() => setDeleteInvoice(inv)}>Удалить</Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -227,6 +251,15 @@ export function InvoicesPage() {
         </div>
         <Pagination page={page} pages={data?.pages ?? 0} total={data?.total ?? 0} onPageChange={setPage} />
       </div>
+
+      <ConfirmModal
+        isOpen={!!deleteInvoice}
+        onClose={() => setDeleteInvoice(null)}
+        onConfirm={handleDelete}
+        title="Удалить счёт"
+        message={`Удалить счёт ${deleteInvoice?.invoice_number}? Записи времени вернутся в статус «Подтверждён».`}
+        loading={deleteLoading}
+      />
 
       <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); resetCreateForm() }} title="Создать счёт" size="lg">
         <form onSubmit={handleCreate}>
