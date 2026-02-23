@@ -83,20 +83,18 @@ export function DashboardPage() {
               ? '…'
               : `${fmtMoney(unbilledConverted.amount)} ${CURRENCY_SYMBOL[unbilledCurrency]}`}
           </div>
-          <div className="stat-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>подтверждённые</span>
-            <div className="lang-switcher" style={{ padding: 0 }}>
-              {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
-                <button
-                  key={cur}
-                  className={`lang-btn ${unbilledCurrency === cur ? 'lang-btn-active' : ''}`}
-                  onClick={() => setUnbilledCurrency(cur)}
-                  style={{ fontSize: 10, padding: '2px 5px' }}
-                >
-                  {cur}
-                </button>
-              ))}
-            </div>
+          <div className="stat-sub">подтверждённые</div>
+          <div className="lang-switcher" style={{ padding: '4px 0 0' }}>
+            {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
+              <button
+                key={cur}
+                className={`lang-btn ${unbilledCurrency === cur ? 'lang-btn-active' : ''}`}
+                onClick={() => setUnbilledCurrency(cur)}
+                style={{ fontSize: 10, padding: '2px 5px' }}
+              >
+                {cur}
+              </button>
+            ))}
           </div>
         </div>
         <div className={`stat-card ${data.overdue_invoices_count > 0 ? 'stat-card--danger' : ''}`}>
