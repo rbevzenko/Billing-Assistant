@@ -9,6 +9,7 @@ import { InvoiceDetailPage } from './pages/InvoiceDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ReportsPage } from './pages/ReportsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import FoodCalorieAnalyzer from './pages/FoodCalorieAnalyzer'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
+      <Route path="/food-analyzer" element={<FoodCalorieAnalyzer />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
