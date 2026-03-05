@@ -34,5 +34,6 @@ export default async function handler(req, res) {
   }
 
   const data = await response.json();
-  res.json({ result: data.content[0].text });
+  const text = data.content[0].text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  res.json({ result: text });
 }
