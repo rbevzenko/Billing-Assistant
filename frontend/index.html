@@ -5,6 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Billing Assistant</title>
+    <script>
+      (function() {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+        // Handle ?p= redirect from 404.html
+        var search = window.location.search;
+        if (search.slice(1, 3) === 'p=') {
+          var decoded = search.slice(3).replace(/~and~/g, '&');
+          var queryIndex = decoded.indexOf('&q=');
+          var path = queryIndex >= 0 ? decoded.slice(0, queryIndex) : decoded;
+          var query = queryIndex >= 0 ? '?' + decoded.slice(queryIndex + 3) : '';
+          history.replaceState(null, null, '/' + path + query + window.location.hash);
+        }
+      })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
