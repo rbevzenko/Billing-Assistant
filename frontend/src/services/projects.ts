@@ -1,66 +1,74 @@
-import { load, save, nextId, nowISO, paginate } from './storage'
-import type { Page, Project, ProjectCreate, ProjectDetail, ProjectUpdate, ProjectStatus, TimeEntry } from '@/types'
+import { supabase } from '@/lib/supabase'
+import type { Page, Project, ProjectCreate, ProjectDetail, ProjectUpdate, ProjectStatus } from '@/types'
 
-const KEY = 'projects'
-const TE_KEY = 'time_entries'
+const TABLE = 'projects'
+
+function paginate<T>(items: T[], total: number, page: number, size: number): Page<T> {
+  return { items, total, page, size, pages: Math.ceil(total / size) || 1 }
+}
 
 export const projectsService = {
-  list: (params: { client_id?: number; status?: ProjectStatus; page?: number; size?: number }): Promise<Page<Project>> => {
-    let items = load<Project>(KEY)
-    if (params.client_id) items = items.filter(p => p.client_id === params.client_id)
-    if (params.status) items = items.filter(p => p.status === params.status)
-    return Promise.resolve(paginate(items, params.page ?? 1, params.size ?? 20))
+  list: async (params: { client_id?: number; status?: ProjectStatus; page?: number; size?: number }): Promise<Page<Project>> => {
+    const page = params.page ?? 1
+    const size = params.size ?? 20
+    const from = (page - 1) * size
+    const to = from + size - 1
+
+    let query = supabase.from(TABLE).select('*', { count: 'exact' })
+    if (params.client_id) query = query.eq('client_id', params.client_id)
+    if (params.status) query = query.eq('status', params.status)
+    query = query.order('created_at', { ascending: false }).range(from, to)
+
+    const { data, error, count } = await query
+    if (error) throw error
+    return paginate(data as Project[], count ?? 0, page, size)
   },
 
-  get: (id: number): Promise<ProjectDetail> => {
-    const project = load<Project>(KEY).find(p => p.id === id)
-    if (!project) return Promise.reject(new Error('Проект не найден'))
-    const entries = load<TimeEntry>(TE_KEY).filter(e => e.project_id === id)
-    const total_hours = entries.reduce((s, e) => s + parseFloat(e.duration_hours), 0)
-    const confirmed_hours = entries
-      .filter(e => e.status !== 'draft')
-      .reduce((s, e) => s + parseFloat(e.duration_hours), 0)
-    const unbilled_hours = entries
-      .filter(e => e.status === 'confirmed')
-      .reduce((s, e) => s + parseFloat(e.duration_hours), 0)
-    return Promise.resolve({
-      ...project,
+  get: async (id: number): Promise<ProjectDetail> => {
+    const { data: project, error } = await supabase.from(TABLE).select('*').eq('id', id).single()
+    if (error) throw new Error('Проект не найден')
+
+    const { data: entries } = await supabase
+      .from('time_entries')
+      .select('duration_hours, status')
+      .eq('project_id', id)
+
+    const all = entries ?? []
+    const total_hours = all.reduce((s, e) => s + parseFloat(e.duration_hours), 0)
+    const confirmed_hours = all.filter(e => e.status !== 'draft').reduce((s, e) => s + parseFloat(e.duration_hours), 0)
+    const unbilled_hours = all.filter(e => e.status === 'confirmed').reduce((s, e) => s + parseFloat(e.duration_hours), 0)
+
+    return {
+      ...(project as Project),
       stats: {
         total_hours: total_hours.toFixed(2),
         confirmed_hours: confirmed_hours.toFixed(2),
         unbilled_hours: unbilled_hours.toFixed(2),
       },
-    })
+    }
   },
 
-  create: (data: ProjectCreate): Promise<Project> => {
-    const items = load<Project>(KEY)
-    const project: Project = {
-      id: nextId(items),
+  create: async (data: ProjectCreate): Promise<Project> => {
+    const { data: created, error } = await supabase.from(TABLE).insert({
       client_id: data.client_id,
       name: data.name,
       description: data.description ?? null,
       hourly_rate: data.hourly_rate ?? null,
       currency: data.currency ?? 'RUB',
       status: data.status ?? 'active',
-      created_at: nowISO(),
-    }
-    save(KEY, [...items, project])
-    return Promise.resolve(project)
+    }).select().single()
+    if (error) throw error
+    return created as Project
   },
 
-  update: (id: number, data: ProjectUpdate): Promise<Project> => {
-    const items = load<Project>(KEY)
-    const idx = items.findIndex(p => p.id === id)
-    if (idx === -1) return Promise.reject(new Error('Проект не найден'))
-    const updated: Project = { ...items[idx], ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) }
-    items[idx] = updated
-    save(KEY, items)
-    return Promise.resolve(updated)
+  update: async (id: number, data: ProjectUpdate): Promise<Project> => {
+    const { data: updated, error } = await supabase.from(TABLE).update(data).eq('id', id).select().single()
+    if (error) throw new Error('Проект не найден')
+    return updated as Project
   },
 
-  delete: (id: number): Promise<void> => {
-    save(KEY, load<Project>(KEY).filter(p => p.id !== id))
-    return Promise.resolve()
+  delete: async (id: number): Promise<void> => {
+    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    if (error) throw error
   },
 }

@@ -1,17 +1,20 @@
-import { load, save, nextId, nowISO, paginate } from './storage'
+import { supabase } from '@/lib/supabase'
 import { getRate, CURRENCY_SYMBOL } from './exchange'
 import { VAT_RATES as VAT_RATE_MAP } from '@/types'
 import { TRANSLATIONS } from '@/i18n/translations'
 import type {
   Currency, Invoice, InvoiceCreate, InvoiceItem, InvoiceStatus, InvoiceUpdate,
-  LawyerProfile, AppLanguage, Page, Project, TimeEntry, VatType,
+  LawyerProfile, AppLanguage, Page, VatType,
 } from '@/types'
 
-const KEY = 'invoices'
+const TABLE = 'invoices'
+const ITEMS_TABLE = 'invoice_items'
 
-function generateInvoiceNumber(invoices: Invoice[]): string {
-  const year = new Date().getFullYear()
-  const count = invoices.filter(inv => inv.invoice_number.includes(String(year))).length + 1
+function paginate<T>(items: T[], total: number, page: number, size: number): Page<T> {
+  return { items, total, page, size, pages: Math.ceil(total / size) || 1 }
+}
+
+function generateInvoiceNumber(year: number, count: number): string {
   return `INV-${year}-${String(count).padStart(3, '0')}`
 }
 
@@ -30,23 +33,47 @@ function printHtml(html: string) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalize(inv: any): Invoice {
-  const subtotal = inv.subtotal ?? inv.total_amount ?? '0'
-  // migrate old vat20 (20%) stored values to vat22 (22%)
-  const vat_type = (inv.vat_type === 'vat20' ? 'vat22' : inv.vat_type ?? 'none') as VatType
+function rowToInvoice(row: any, items: InvoiceItem[]): Invoice {
+  const vat_type = (row.vat_type === 'vat20' ? 'vat22' : row.vat_type ?? 'none') as VatType
   return {
-    profile_id: 1,
-    currency: 'RUB',
-    vat_amount: '0',
-    ...inv,
+    id: row.id,
+    client_id: row.client_id,
+    profile_id: row.profile_id ?? 1,
+    invoice_number: row.invoice_number,
+    issue_date: row.issue_date,
+    due_date: row.due_date,
+    status: row.status,
+    notes: row.notes,
+    created_at: row.created_at,
+    currency: row.currency ?? 'RUB',
     vat_type,
-    subtotal,
-    total_amount: inv.total_amount ?? subtotal,
-  } as Invoice
+    subtotal: row.subtotal ?? '0',
+    vat_amount: row.vat_amount ?? '0',
+    total_amount: row.total_amount ?? '0',
+    payment_currency: row.payment_currency,
+    exchange_rate: row.exchange_rate,
+    payment_amount: row.payment_amount,
+    items,
+  }
+}
+
+async function fetchItems(invoiceId: number): Promise<InvoiceItem[]> {
+  const { data } = await supabase.from(ITEMS_TABLE).select('*').eq('invoice_id', invoiceId).order('id')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((item: any) => ({
+    id: item.id,
+    time_entry_id: item.time_entry_id,
+    hours: item.hours,
+    rate: item.rate,
+    amount: item.amount,
+    date: item.date,
+    project_name: item.project_name,
+    description: item.description,
+  }))
 }
 
 export const invoicesService = {
-  list: (params: {
+  list: async (params: {
     client_id?: number
     status?: InvoiceStatus
     date_from?: string
@@ -54,40 +81,62 @@ export const invoicesService = {
     page?: number
     size?: number
   }): Promise<Page<Invoice>> => {
-    let items = load<Invoice>(KEY).map(normalize)
-    if (params.client_id) items = items.filter(inv => inv.client_id === params.client_id)
-    if (params.status) items = items.filter(inv => inv.status === params.status)
-    if (params.date_from) items = items.filter(inv => inv.issue_date >= params.date_from!)
-    if (params.date_to) items = items.filter(inv => inv.issue_date <= params.date_to!)
-    items = [...items].sort((a, b) => b.created_at.localeCompare(a.created_at))
-    return Promise.resolve(paginate(items, params.page ?? 1, params.size ?? 20))
+    const page = params.page ?? 1
+    const size = params.size ?? 20
+    const from = (page - 1) * size
+    const to = from + size - 1
+
+    let query = supabase.from(TABLE).select('*', { count: 'exact' })
+    if (params.client_id) query = query.eq('client_id', params.client_id)
+    if (params.status) query = query.eq('status', params.status)
+    if (params.date_from) query = query.gte('issue_date', params.date_from)
+    if (params.date_to) query = query.lte('issue_date', params.date_to)
+    query = query.order('created_at', { ascending: false }).range(from, to)
+
+    const { data, error, count } = await query
+    if (error) throw error
+
+    const invoices: Invoice[] = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (data ?? []).map(async (row: any) => rowToInvoice(row, await fetchItems(row.id)))
+    )
+    return paginate(invoices, count ?? 0, page, size)
   },
 
-  get: (id: number): Promise<Invoice> => {
-    const item = load<Invoice>(KEY).map(normalize).find(inv => inv.id === id)
-    if (!item) return Promise.reject(new Error('Счёт не найден'))
-    return Promise.resolve(item)
+  get: async (id: number): Promise<Invoice> => {
+    const { data: row, error } = await supabase.from(TABLE).select('*').eq('id', id).single()
+    if (error) throw new Error('Счёт не найден')
+    const items = await fetchItems(id)
+    return rowToInvoice(row, items)
   },
 
   create: async (data: InvoiceCreate): Promise<Invoice> => {
-    const invoices = load<Invoice>(KEY).map(normalize)
-    const timeEntries = load<TimeEntry>('time_entries')
-    const projects = load<Project>('projects')
-    const profiles = load<LawyerProfile>('profiles')
-    const profile = profiles.find(p => p.id === data.profile_id) ?? profiles[0]
+    const year = new Date().getFullYear()
 
+    const [
+      { data: timeEntriesRows },
+      { data: projectsRows },
+      { data: profileRow },
+      { data: existingInvoices },
+    ] = await Promise.all([
+      supabase.from('time_entries').select('*').in('id', data.time_entry_ids),
+      supabase.from('projects').select('*'),
+      supabase.from('lawyer_profiles').select('*').eq('id', data.profile_id).single(),
+      supabase.from(TABLE).select('invoice_number').ilike('invoice_number', `INV-${year}-%`),
+    ])
+
+    const profile = profileRow as LawyerProfile | null
     const currency: Currency = data.currency ?? profile?.default_currency ?? 'RUB'
     const vatType: VatType = data.vat_type ?? profile?.vat_type ?? 'none'
     const paymentCurrency: Currency | undefined = data.payment_currency
 
-    const selectedEntries = timeEntries.filter(e => data.time_entry_ids.includes(e.id))
-    const items: InvoiceItem[] = selectedEntries.map((entry, idx) => {
-      const project = projects.find(p => p.id === entry.project_id)
+    const selectedEntries = (timeEntriesRows ?? []).filter(e => data.time_entry_ids.includes(e.id))
+    const itemsData = selectedEntries.map(entry => {
+      const project = (projectsRows ?? []).find(p => p.id === entry.project_id)
       const rate = project?.hourly_rate ?? profile?.default_hourly_rate ?? '0'
       const hours = parseFloat(entry.duration_hours)
       const amount = (hours * parseFloat(rate)).toFixed(2)
       return {
-        id: idx + 1,
         time_entry_id: entry.id,
         hours: entry.duration_hours,
         rate,
@@ -98,7 +147,7 @@ export const invoicesService = {
       }
     })
 
-    const subtotalNum = items.reduce((s, i) => s + parseFloat(i.amount), 0)
+    const subtotalNum = itemsData.reduce((s, i) => s + parseFloat(i.amount), 0)
     const vatNum = calcVat(subtotalNum, vatType)
     const totalNum = subtotalNum + vatNum
 
@@ -113,17 +162,15 @@ export const invoicesService = {
       }
     }
 
-    const invoice: Invoice = {
-      id: nextId(invoices),
+    const count = (existingInvoices ?? []).length + 1
+    const invoicePayload = {
       client_id: data.client_id,
       profile_id: data.profile_id,
-      invoice_number: generateInvoiceNumber(invoices),
+      invoice_number: generateInvoiceNumber(year, count),
       issue_date: data.issue_date,
       due_date: data.due_date,
       status: 'draft',
       notes: data.notes ?? null,
-      created_at: nowISO(),
-      items,
       currency,
       vat_type: vatType,
       subtotal: subtotalNum.toFixed(2),
@@ -134,55 +181,70 @@ export const invoicesService = {
         : {}),
     }
 
-    const updatedEntries = timeEntries.map(e =>
-      data.time_entry_ids.includes(e.id) ? { ...e, status: 'billed' as const, updated_at: nowISO() } : e
-    )
-    save('time_entries', updatedEntries)
-    save(KEY, [...invoices, invoice])
-    return invoice
+    const { data: createdInvoice, error: invError } = await supabase.from(TABLE).insert(invoicePayload).select().single()
+    if (invError) throw invError
+
+    const invoiceId = createdInvoice.id
+    const { data: createdItems } = await supabase
+      .from(ITEMS_TABLE)
+      .insert(itemsData.map(item => ({ ...item, invoice_id: invoiceId })))
+      .select()
+
+    await supabase
+      .from('time_entries')
+      .update({ status: 'billed', updated_at: new Date().toISOString() })
+      .in('id', data.time_entry_ids)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: InvoiceItem[] = (createdItems ?? []).map((item: any) => ({
+      id: item.id,
+      time_entry_id: item.time_entry_id,
+      hours: item.hours,
+      rate: item.rate,
+      amount: item.amount,
+      date: item.date,
+      project_name: item.project_name,
+      description: item.description,
+    }))
+
+    return rowToInvoice(createdInvoice, items)
   },
 
-  update: (id: number, data: InvoiceUpdate): Promise<Invoice> => {
-    const items = load<Invoice>(KEY).map(normalize)
-    const idx = items.findIndex(inv => inv.id === id)
-    if (idx === -1) return Promise.reject(new Error('Счёт не найден'))
-    const updated: Invoice = { ...items[idx], ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) }
-    items[idx] = updated
-    save(KEY, items)
-    return Promise.resolve(updated)
+  update: async (id: number, data: InvoiceUpdate): Promise<Invoice> => {
+    const { data: updated, error } = await supabase.from(TABLE).update(data).eq('id', id).select().single()
+    if (error) throw new Error('Счёт не найден')
+    const items = await fetchItems(id)
+    return rowToInvoice(updated, items)
   },
 
-  delete: (id: number): Promise<void> => {
-    save(KEY, load<Invoice>(KEY).map(normalize).filter(inv => inv.id !== id))
-    return Promise.resolve()
+  delete: async (id: number): Promise<void> => {
+    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    if (error) throw error
   },
 
-  send: (id: number): Promise<Invoice> => {
-    const items = load<Invoice>(KEY).map(normalize)
-    const idx = items.findIndex(inv => inv.id === id)
-    if (idx === -1) return Promise.reject(new Error('Счёт не найден'))
-    items[idx] = { ...items[idx], status: 'sent' }
-    save(KEY, items)
-    return Promise.resolve(items[idx])
+  send: async (id: number): Promise<Invoice> => {
+    const { data: updated, error } = await supabase.from(TABLE).update({ status: 'sent' }).eq('id', id).select().single()
+    if (error) throw new Error('Счёт не найден')
+    return rowToInvoice(updated, await fetchItems(id))
   },
 
-  pay: (id: number): Promise<Invoice> => {
-    const items = load<Invoice>(KEY).map(normalize)
-    const idx = items.findIndex(inv => inv.id === id)
-    if (idx === -1) return Promise.reject(new Error('Счёт не найден'))
-    items[idx] = { ...items[idx], status: 'paid' }
-    save(KEY, items)
-    return Promise.resolve(items[idx])
+  pay: async (id: number): Promise<Invoice> => {
+    const { data: updated, error } = await supabase.from(TABLE).update({ status: 'paid' }).eq('id', id).select().single()
+    if (error) throw new Error('Счёт не найден')
+    return rowToInvoice(updated, await fetchItems(id))
   },
 
   downloadPdf: async (id: number, _invoiceNumber: string): Promise<void> => {
-    const invoice = load<Invoice>(KEY).map(normalize).find(inv => inv.id === id)
+    const invoice = await invoicesService.get(id)
     if (!invoice) return
 
-    const profiles = load<LawyerProfile>('profiles')
-    const profile = profiles.find(p => p.id === invoice.profile_id) ?? profiles[0] ?? null
-    const client = load<{ id: number; name: string; inn?: string | null; address?: string | null; email?: string | null }>('clients')
-      .find(c => c.id === invoice.client_id)
+    const [{ data: profileRow }, { data: clientRow }] = await Promise.all([
+      supabase.from('lawyer_profiles').select('*').eq('id', invoice.profile_id).single(),
+      supabase.from('clients').select('id, name, inn, address, email').eq('id', invoice.client_id).single(),
+    ])
+
+    const profile = profileRow as LawyerProfile | null
+    const client = clientRow as { id: number; name: string; inn?: string | null; address?: string | null; email?: string | null } | null
 
     const lang: AppLanguage = profile?.language ?? 'ru'
     const T = TRANSLATIONS[lang]

@@ -1,10 +1,14 @@
-import { load, save, nextId, nowISO, paginate } from './storage'
-import type { BulkConfirmResponse, Page, Project, TimeEntry, TimeEntryCreate, TimeEntryStatus, TimeEntryUpdate } from '@/types'
+import { supabase } from '@/lib/supabase'
+import type { BulkConfirmResponse, Page, TimeEntry, TimeEntryCreate, TimeEntryStatus, TimeEntryUpdate } from '@/types'
 
-const KEY = 'time_entries'
+const TABLE = 'time_entries'
+
+function paginate<T>(items: T[], total: number, page: number, size: number): Page<T> {
+  return { items, total, page, size, pages: Math.ceil(total / size) || 1 }
+}
 
 export const timeEntriesService = {
-  list: (params: {
+  list: async (params: {
     client_id?: number
     project_id?: number
     date_from?: string
@@ -13,81 +17,91 @@ export const timeEntriesService = {
     page?: number
     size?: number
   }): Promise<Page<TimeEntry>> => {
-    let items = load<TimeEntry>(KEY)
-    if (params.project_id) items = items.filter(e => e.project_id === params.project_id)
-    if (params.status) items = items.filter(e => e.status === params.status)
-    if (params.date_from) items = items.filter(e => e.date >= params.date_from!)
-    if (params.date_to) items = items.filter(e => e.date <= params.date_to!)
+    const page = params.page ?? 1
+    const size = params.size ?? 20
+    const from = (page - 1) * size
+    const to = from + size - 1
+
+    let projectIds: number[] | null = null
     if (params.client_id) {
-      const projectIds = new Set(
-        load<Project>('projects')
-          .filter(p => p.client_id === params.client_id)
-          .map(p => p.id)
-      )
-      items = items.filter(e => projectIds.has(e.project_id))
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('client_id', params.client_id)
+      projectIds = (projects ?? []).map(p => p.id)
+      if (projectIds.length === 0) return paginate([], 0, page, size)
     }
-    items = [...items].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
-    return Promise.resolve(paginate(items, params.page ?? 1, params.size ?? 20))
+
+    let query = supabase.from(TABLE).select('*', { count: 'exact' })
+    if (params.project_id) query = query.eq('project_id', params.project_id)
+    else if (projectIds) query = query.in('project_id', projectIds)
+    if (params.status) query = query.eq('status', params.status)
+    if (params.date_from) query = query.gte('date', params.date_from)
+    if (params.date_to) query = query.lte('date', params.date_to)
+    query = query.order('date', { ascending: false }).order('created_at', { ascending: false }).range(from, to)
+
+    const { data, error, count } = await query
+    if (error) throw error
+    return paginate(data as TimeEntry[], count ?? 0, page, size)
   },
 
-  create: (data: TimeEntryCreate): Promise<TimeEntry> => {
-    const items = load<TimeEntry>(KEY)
-    const entry: TimeEntry = {
-      id: nextId(items),
+  create: async (data: TimeEntryCreate): Promise<TimeEntry> => {
+    const { data: created, error } = await supabase.from(TABLE).insert({
       project_id: data.project_id,
       date: data.date,
       duration_hours: String(data.duration_hours),
       description: data.description ?? null,
       status: 'draft',
-      created_at: nowISO(),
-      updated_at: nowISO(),
+    }).select().single()
+    if (error) throw error
+    return created as TimeEntry
+  },
+
+  update: async (id: number, data: TimeEntryUpdate): Promise<TimeEntry> => {
+    const { data: updated, error } = await supabase
+      .from(TABLE)
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error('Запись не найдена')
+    return updated as TimeEntry
+  },
+
+  delete: async (id: number): Promise<void> => {
+    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    if (error) throw error
+  },
+
+  confirm: async (id: number): Promise<TimeEntry> => {
+    const { data: updated, error } = await supabase
+      .from(TABLE)
+      .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error('Запись не найдена')
+    return updated as TimeEntry
+  },
+
+  bulkConfirm: async (ids: number[]): Promise<BulkConfirmResponse> => {
+    const { data: drafts, error } = await supabase
+      .from(TABLE)
+      .select('id')
+      .in('id', ids)
+      .eq('status', 'draft')
+    if (error) throw error
+
+    const draftIds = (drafts ?? []).map(e => e.id)
+    const skipped_ids = ids.filter(id => !draftIds.includes(id))
+
+    if (draftIds.length > 0) {
+      await supabase
+        .from(TABLE)
+        .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+        .in('id', draftIds)
     }
-    save(KEY, [...items, entry])
-    return Promise.resolve(entry)
-  },
 
-  update: (id: number, data: TimeEntryUpdate): Promise<TimeEntry> => {
-    const items = load<TimeEntry>(KEY)
-    const idx = items.findIndex(e => e.id === id)
-    if (idx === -1) return Promise.reject(new Error('Запись не найдена'))
-    const updated: TimeEntry = {
-      ...items[idx],
-      ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)),
-      updated_at: nowISO(),
-    }
-    items[idx] = updated
-    save(KEY, items)
-    return Promise.resolve(updated)
-  },
-
-  delete: (id: number): Promise<void> => {
-    save(KEY, load<TimeEntry>(KEY).filter(e => e.id !== id))
-    return Promise.resolve()
-  },
-
-  confirm: (id: number): Promise<TimeEntry> => {
-    const items = load<TimeEntry>(KEY)
-    const idx = items.findIndex(e => e.id === id)
-    if (idx === -1) return Promise.reject(new Error('Запись не найдена'))
-    items[idx] = { ...items[idx], status: 'confirmed', updated_at: nowISO() }
-    save(KEY, items)
-    return Promise.resolve(items[idx])
-  },
-
-  bulkConfirm: (ids: number[]): Promise<BulkConfirmResponse> => {
-    const items = load<TimeEntry>(KEY)
-    let confirmed_count = 0
-    const skipped_ids: number[] = []
-    for (const id of ids) {
-      const idx = items.findIndex(e => e.id === id)
-      if (idx !== -1 && items[idx].status === 'draft') {
-        items[idx] = { ...items[idx], status: 'confirmed', updated_at: nowISO() }
-        confirmed_count++
-      } else {
-        skipped_ids.push(id)
-      }
-    }
-    save(KEY, items)
-    return Promise.resolve({ confirmed_count, skipped_count: skipped_ids.length, skipped_ids })
+    return { confirmed_count: draftIds.length, skipped_count: skipped_ids.length, skipped_ids }
   },
 }

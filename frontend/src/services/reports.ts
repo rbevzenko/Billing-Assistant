@@ -1,7 +1,6 @@
-import { load, loadOne } from './storage'
+import { supabase } from '@/lib/supabase'
 import type {
-  Client, ClientBreakdown, Invoice, InvoiceSummary, LawyerProfile,
-  Project, ProjectBreakdown, ReportData, TimeEntry,
+  ClientBreakdown, InvoiceSummary, ProjectBreakdown, ReportData,
 } from '@/types'
 
 export interface ReportParams {
@@ -11,32 +10,38 @@ export interface ReportParams {
 }
 
 export const reportsService = {
-  get: (params: ReportParams): Promise<ReportData> => {
-    const allEntries = load<TimeEntry>('time_entries')
-    const allInvoices = load<Invoice>('invoices')
-    const projects = load<Project>('projects')
-    const clients = load<Client>('clients')
-    const profile = loadOne<LawyerProfile>('profile')
+  get: async (params: ReportParams): Promise<ReportData> => {
+    const [
+      { data: allEntries },
+      { data: allInvoices },
+      { data: projects },
+      { data: clients },
+      { data: profiles },
+    ] = await Promise.all([
+      supabase.from('time_entries').select('*').gte('date', params.date_from).lte('date', params.date_to),
+      supabase.from('invoices').select('*').gte('issue_date', params.date_from).lte('issue_date', params.date_to),
+      supabase.from('projects').select('*'),
+      supabase.from('clients').select('*'),
+      supabase.from('lawyer_profiles').select('*').order('id').limit(1),
+    ])
 
-    let entries = allEntries.filter(
-      e => e.date >= params.date_from && e.date <= params.date_to
-    )
-    let invoices = allInvoices.filter(
-      inv => inv.issue_date >= params.date_from && inv.issue_date <= params.date_to
-    )
+    const profile = (profiles ?? [])[0] ?? null
+    let entries = allEntries ?? []
+    let invoices = allInvoices ?? []
+    const allProjects = projects ?? []
+    const allClients = clients ?? []
 
     if (params.client_id) {
       const clientProjectIds = new Set(
-        projects.filter(p => p.client_id === params.client_id).map(p => p.id)
+        allProjects.filter(p => p.client_id === params.client_id).map(p => p.id)
       )
       entries = entries.filter(e => clientProjectIds.has(e.project_id))
       invoices = invoices.filter(inv => inv.client_id === params.client_id)
     }
 
-    // Group entries by client → project
     const clientMap = new Map<number, Map<number, { hours: number; amount: number; count: number }>>()
     for (const e of entries) {
-      const project = projects.find(p => p.id === e.project_id)
+      const project = allProjects.find(p => p.id === e.project_id)
       if (!project) continue
       const rate = parseFloat(project.hourly_rate ?? profile?.default_hourly_rate ?? '0')
       const hours = parseFloat(e.duration_hours)
@@ -49,12 +54,12 @@ export const reportsService = {
 
     const breakdown: ClientBreakdown[] = []
     for (const [clientId, projMap] of clientMap.entries()) {
-      const client = clients.find(c => c.id === clientId)
+      const client = allClients.find(c => c.id === clientId)
       const projectBreakdowns: ProjectBreakdown[] = []
       let clientHours = 0
       let clientAmount = 0
       for (const [projectId, stats] of projMap.entries()) {
-        const project = projects.find(p => p.id === projectId)
+        const project = allProjects.find(p => p.id === projectId)
         projectBreakdowns.push({
           project_id: projectId,
           project_name: project?.name ?? '—',
@@ -87,7 +92,7 @@ export const reportsService = {
       total_unpaid: invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + parseFloat(i.total_amount), 0),
     }
 
-    return Promise.resolve({
+    return {
       date_from: params.date_from,
       date_to: params.date_to,
       client_id: params.client_id ?? null,
@@ -95,24 +100,31 @@ export const reportsService = {
       total_amount,
       breakdown,
       invoice_summary,
-    })
+    }
   },
 
   downloadPdf: async (params: ReportParams): Promise<void> => {
     const data = await reportsService.get(params)
 
-    const allEntries = load<TimeEntry>('time_entries')
-    const projects = load<Project>('projects')
-    const storedProfiles = load<LawyerProfile>('profiles')
+    const [
+      { data: allEntriesRaw },
+      { data: projectsRaw },
+      { data: profilesRaw },
+    ] = await Promise.all([
+      supabase.from('time_entries').select('*').gte('date', params.date_from).lte('date', params.date_to),
+      supabase.from('projects').select('*'),
+      supabase.from('lawyer_profiles').select('*').order('id').limit(1),
+    ])
+
     const activeId = localStorage.getItem('billing_active_profile_id')
+    const storedProfiles = profilesRaw ?? []
     const profile = (activeId ? storedProfiles.find(p => p.id === Number(activeId)) : null)
       ?? storedProfiles[0] ?? null
 
-    let entries = allEntries.filter(
-      e => e.date >= params.date_from && e.date <= params.date_to
-    )
+    const allProjects = projectsRaw ?? []
+    let entries = allEntriesRaw ?? []
     if (params.client_id) {
-      const ids = new Set(projects.filter(p => p.client_id === params.client_id).map(p => p.id))
+      const ids = new Set(allProjects.filter(p => p.client_id === params.client_id).map(p => p.id))
       entries = entries.filter(e => ids.has(e.project_id))
     }
     entries.sort((a, b) => a.date.localeCompare(b.date))
@@ -122,7 +134,7 @@ export const reportsService = {
 
     const clientRowsHtml = data.breakdown.map(c => {
       const projRowsHtml = c.projects.map(proj => {
-        const project = projects.find(p => p.id === proj.project_id)
+        const project = allProjects.find(p => p.id === proj.project_id)
         const rate = parseFloat(project?.hourly_rate ?? profile?.default_hourly_rate ?? '0')
         const cur = project?.currency ?? 'RUB'
         const curSym = cur === 'USD' ? '$' : cur === 'EUR' ? '€' : '₽'
