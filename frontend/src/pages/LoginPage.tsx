@@ -16,7 +16,8 @@ export function LoginPage() {
     try {
       await signIn(email, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка входа')
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg || 'Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.')
     } finally {
       setLoading(false)
     }
