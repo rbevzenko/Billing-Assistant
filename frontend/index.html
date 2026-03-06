@@ -19,7 +19,8 @@
           var queryIndex = decoded.indexOf('&q=');
           var path = queryIndex >= 0 ? decoded.slice(0, queryIndex) : decoded;
           var query = queryIndex >= 0 ? '?' + decoded.slice(queryIndex + 3) : '';
-          history.replaceState(null, null, '/' + path + query + window.location.hash);
+          var base = window.location.pathname;
+          history.replaceState(null, null, base + path.replace(/^\//, '') + query + window.location.hash);
         }
       })();
     </script>
