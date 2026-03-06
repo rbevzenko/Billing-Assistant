@@ -187,7 +187,7 @@ export function DashboardPage() {
                           className={isOverdue ? 'overdue-date' : ''}>
                         {inv.due_date}
                       </td>
-                      <td className="td-num">{fmtMoney(inv.total_amount)} ₽</td>
+                      <td className="td-num">{fmtMoney(inv.total_amount)} {CURRENCY_SYMBOL[inv.currency]}</td>
                       <td>
                         <span className={`badge ${STATUS_CLASS[inv.status]}`}>
                           {STATUS_LABEL[inv.status]}
