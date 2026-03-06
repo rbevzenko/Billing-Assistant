@@ -292,7 +292,7 @@ function DailyCounter({ log, onClear }: { log: DailyLog; onClear: () => void }) 
         <span className="text-sm font-semibold text-gray-600">Today's calories</span>
         <button
           onClick={onClear}
-          className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+          className="text-xs text-gray-500 underline hover:text-red-500 transition-colors"
         >
           Reset day
         </button>
