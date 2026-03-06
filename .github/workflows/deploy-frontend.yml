@@ -41,7 +41,6 @@ jobs:
         working-directory: frontend
         env:
           GITHUB_PAGES: true
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
 
       - name: Setup Pages
@@ -53,6 +52,7 @@ jobs:
           path: frontend/dist
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
