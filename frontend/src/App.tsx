@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
 import { RequireAuth } from './components/auth/RequireAuth'
 import { LoginPage } from './pages/LoginPage'
+import { MigrationPage } from './pages/MigrationPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ClientsPage } from './pages/ClientsPage'
 import { ProjectsPage } from './pages/ProjectsPage'
@@ -26,6 +27,7 @@ function App() {
           <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/migrate" element={<MigrationPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />
