@@ -1,9 +1,11 @@
 import { useLocation } from 'react-router-dom'
 import { useLanguage } from '@/i18n/translations'
+import { useAuth } from '@/context/AuthContext'
 
 export function Header() {
   const location = useLocation()
   const { t } = useLanguage()
+  const { signOut } = useAuth()
   const path = location.pathname
 
   let title = t.header[path as keyof typeof t.header]
@@ -13,6 +15,9 @@ export function Header() {
   return (
     <header className="header">
       <h1 className="header-title">{title}</h1>
+      <button className="btn btn-ghost btn-sm" onClick={signOut} title="Выйти">
+        Выйти
+      </button>
     </header>
   )
 }

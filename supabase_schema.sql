@@ -108,13 +108,25 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 
 -- ============================================================
--- Disable Row Level Security (single-user app without auth).
--- WARNING: anyone with the anon key can read/write all data.
--- Enable RLS + add auth if you need multi-user isolation.
+-- Row Level Security — allow access only to authenticated users.
+-- Any signed-in user can read/write all data (single-owner app).
 -- ============================================================
-ALTER TABLE clients         DISABLE ROW LEVEL SECURITY;
-ALTER TABLE lawyer_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE projects        DISABLE ROW LEVEL SECURITY;
-ALTER TABLE time_entries    DISABLE ROW LEVEL SECURITY;
-ALTER TABLE invoices        DISABLE ROW LEVEL SECURITY;
-ALTER TABLE invoice_items   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE clients         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lawyer_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_entries    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items   ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "auth_all" ON clients         FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all" ON lawyer_profiles FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all" ON projects        FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all" ON time_entries    FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all" ON invoices        FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all" ON invoice_items   FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- ============================================================
+-- Create the app user in Supabase Dashboard:
+--   Authentication → Users → Invite user (or Add user)
+-- No SQL needed — Supabase Auth handles user creation.
+-- ============================================================
