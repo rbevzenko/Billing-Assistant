@@ -140,7 +140,7 @@ async function recalculateFromIngredients(items: FoodItem[], dish: string): Prom
 
 // ── Daily log helpers ──────────────────────────────────────────────────────────
 
-const DAILY_GOAL = 2000
+const DAILY_GOAL = 1500
 const STORAGE_KEY = 'foodscan_daily_log'
 
 function todayStr(): string {
