@@ -1,85 +1,44 @@
-import { load, save, nextId } from './storage'
+import { supabase } from '@/lib/supabase'
 import type { LawyerProfile, LawyerProfileUpdate } from '@/types'
 
-const KEY = 'profiles'
-const ACTIVE_KEY = 'active_profile_id'
-
-function migrateOldProfile(): LawyerProfile[] {
-  try {
-    const raw = localStorage.getItem('billing_profile')
-    if (!raw) return []
-    const old = JSON.parse(raw)
-    const profile: LawyerProfile = {
-      id: 1,
-      label: 'Российский профиль',
-      type: 'ru',
-      language: 'ru',
-      full_name: old.full_name ?? '',
-      company_name: old.company_name ?? '',
-      address: old.address ?? '',
-      email: old.email ?? '',
-      phone: old.phone ?? '',
-      default_hourly_rate: old.default_hourly_rate ?? '',
-      default_currency: 'RUB',
-      vat_type: 'none',
-      logo_path: old.logo_path ?? null,
-      inn: old.inn,
-      bank_name: old.bank_name,
-      bik: old.bik,
-      checking_account: old.checking_account,
-      correspondent_account: old.correspondent_account,
-    }
-    localStorage.removeItem('billing_profile')
-    return [profile]
-  } catch {
-    return []
-  }
-}
-
-function getProfiles(): LawyerProfile[] {
-  const profiles = load<LawyerProfile>(KEY)
-  if (profiles.length > 0) return profiles
-  const migrated = migrateOldProfile()
-  if (migrated.length > 0) {
-    save(KEY, migrated)
-    return migrated
-  }
-  return []
-}
+const TABLE = 'lawyer_profiles'
+const ACTIVE_KEY = 'billing_active_profile_id'
 
 export const profileService = {
-  list: (): Promise<LawyerProfile[]> =>
-    Promise.resolve(getProfiles()),
+  list: async (): Promise<LawyerProfile[]> => {
+    const { data, error } = await supabase.from(TABLE).select('*').order('id')
+    if (error) throw error
+    return (data ?? []) as LawyerProfile[]
+  },
 
-  getActive: (): Promise<LawyerProfile | null> => {
-    const profiles = getProfiles()
-    if (profiles.length === 0) return Promise.resolve(null)
-    const activeId = localStorage.getItem('billing_' + ACTIVE_KEY)
+  getActive: async (): Promise<LawyerProfile | null> => {
+    const { data: profiles, error } = await supabase.from(TABLE).select('*').order('id')
+    if (error || !profiles || profiles.length === 0) return null
+    const activeId = localStorage.getItem(ACTIVE_KEY)
     const active = activeId ? profiles.find(p => p.id === Number(activeId)) : null
-    return Promise.resolve(active ?? profiles[0])
+    return (active ?? profiles[0]) as LawyerProfile
   },
 
   // Legacy compat used by InvoiceDetailPage
   get: (): Promise<LawyerProfile | null> => profileService.getActive(),
 
-  getById: (id: number): Promise<LawyerProfile | null> =>
-    Promise.resolve(getProfiles().find(p => p.id === id) ?? null),
-
-  setActive: (id: number): void => {
-    localStorage.setItem('billing_' + ACTIVE_KEY, String(id))
+  getById: async (id: number): Promise<LawyerProfile | null> => {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('id', id).single()
+    if (error) return null
+    return data as LawyerProfile
   },
 
-  upsert: (data: LawyerProfileUpdate, id?: number): Promise<LawyerProfile> => {
-    const profiles = getProfiles()
+  setActive: (id: number): void => {
+    localStorage.setItem(ACTIVE_KEY, String(id))
+  },
+
+  upsert: async (data: LawyerProfileUpdate, id?: number): Promise<LawyerProfile> => {
     if (id !== undefined) {
-      const idx = profiles.findIndex(p => p.id === id)
-      if (idx === -1) return Promise.reject(new Error('Профиль не найден'))
-      profiles[idx] = { ...profiles[idx], ...data }
-      save(KEY, profiles)
-      return Promise.resolve(profiles[idx])
+      const { data: updated, error } = await supabase.from(TABLE).update(data).eq('id', id).select().single()
+      if (error) throw new Error('Профиль не найден')
+      return updated as LawyerProfile
     }
-    const profile: LawyerProfile = {
-      id: nextId(profiles),
+    const profile = {
       label: data.label ?? 'Новый профиль',
       type: data.type ?? 'ru',
       language: data.language ?? 'ru',
@@ -94,14 +53,15 @@ export const profileService = {
       logo_path: data.logo_path ?? null,
       ...data,
     }
-    save(KEY, [...profiles, profile])
-    return Promise.resolve(profile)
+    const { data: created, error } = await supabase.from(TABLE).insert(profile).select().single()
+    if (error) throw error
+    return created as LawyerProfile
   },
 
-  delete: (id: number): Promise<void> => {
-    const profiles = getProfiles()
-    if (profiles.length <= 1) return Promise.reject(new Error('Нельзя удалить единственный профиль'))
-    save(KEY, profiles.filter(p => p.id !== id))
-    return Promise.resolve()
+  delete: async (id: number): Promise<void> => {
+    const { data: profiles } = await supabase.from(TABLE).select('id')
+    if ((profiles ?? []).length <= 1) throw new Error('Нельзя удалить единственный профиль')
+    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    if (error) throw error
   },
 }

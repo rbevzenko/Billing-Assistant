@@ -1,61 +1,52 @@
-import { load, save, nextId, nowISO, paginate } from './storage'
+import { supabase } from '@/lib/supabase'
 import type { Client, ClientCreate, ClientUpdate, Page } from '@/types'
 
-const KEY = 'clients'
+const TABLE = 'clients'
+
+function paginate<T>(items: T[], total: number, page: number, size: number): Page<T> {
+  return { items, total, page, size, pages: Math.ceil(total / size) || 1 }
+}
 
 export const clientsService = {
-  list: (params: { search?: string; page?: number; size?: number }): Promise<Page<Client>> => {
-    let items = load<Client>(KEY)
+  list: async (params: { search?: string; page?: number; size?: number }): Promise<Page<Client>> => {
+    const page = params.page ?? 1
+    const size = params.size ?? 20
+    const from = (page - 1) * size
+    const to = from + size - 1
+
+    let query = supabase.from(TABLE).select('*', { count: 'exact' })
     if (params.search) {
-      const q = params.search.toLowerCase()
-      items = items.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        (c.contact_person?.toLowerCase().includes(q) ?? false) ||
-        (c.email?.toLowerCase().includes(q) ?? false)
+      query = query.or(
+        `name.ilike.%${params.search}%,contact_person.ilike.%${params.search}%,email.ilike.%${params.search}%`
       )
     }
-    return Promise.resolve(paginate(items, params.page ?? 1, params.size ?? 20))
+    query = query.order('created_at', { ascending: false }).range(from, to)
+
+    const { data, error, count } = await query
+    if (error) throw error
+    return paginate(data as Client[], count ?? 0, page, size)
   },
 
-  get: (id: number): Promise<Client> => {
-    const item = load<Client>(KEY).find(c => c.id === id)
-    if (!item) return Promise.reject(new Error('Клиент не найден'))
-    return Promise.resolve(item)
+  get: async (id: number): Promise<Client> => {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('id', id).single()
+    if (error) throw new Error('Клиент не найден')
+    return data as Client
   },
 
-  create: (data: ClientCreate): Promise<Client> => {
-    const items = load<Client>(KEY)
-    const client: Client = {
-      id: nextId(items),
-      name: data.name,
-      contact_person: data.contact_person ?? null,
-      email: data.email ?? null,
-      phone: data.phone ?? null,
-      address: data.address ?? null,
-      inn: data.inn ?? null,
-      bank_name: data.bank_name ?? null,
-      bik: data.bik ?? null,
-      checking_account: data.checking_account ?? null,
-      correspondent_account: data.correspondent_account ?? null,
-      notes: data.notes ?? null,
-      created_at: nowISO(),
-    }
-    save(KEY, [...items, client])
-    return Promise.resolve(client)
+  create: async (data: ClientCreate): Promise<Client> => {
+    const { data: created, error } = await supabase.from(TABLE).insert(data).select().single()
+    if (error) throw error
+    return created as Client
   },
 
-  update: (id: number, data: ClientUpdate): Promise<Client> => {
-    const items = load<Client>(KEY)
-    const idx = items.findIndex(c => c.id === id)
-    if (idx === -1) return Promise.reject(new Error('Клиент не найден'))
-    const updated: Client = { ...items[idx], ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) }
-    items[idx] = updated
-    save(KEY, items)
-    return Promise.resolve(updated)
+  update: async (id: number, data: ClientUpdate): Promise<Client> => {
+    const { data: updated, error } = await supabase.from(TABLE).update(data).eq('id', id).select().single()
+    if (error) throw new Error('Клиент не найден')
+    return updated as Client
   },
 
-  delete: (id: number): Promise<void> => {
-    save(KEY, load<Client>(KEY).filter(c => c.id !== id))
-    return Promise.resolve()
+  delete: async (id: number): Promise<void> => {
+    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    if (error) throw error
   },
 }
