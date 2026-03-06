@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, DragEvent, ChangeEvent } from 'react'
+import { useState, useRef, useCallback, DragEvent, ChangeEvent, useEffect } from 'react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -101,6 +101,43 @@ async function analyzeImage(file: File): Promise<AnalysisResult> {
   return JSON.parse(text) as AnalysisResult
 }
 
+async function recalculateFromIngredients(items: FoodItem[], dish: string): Promise<AnalysisResult> {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string
+  if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set.')
+
+  const ingredientList = items.map((i) => `${i.name}: ${i.amount}`).join(', ')
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-calls': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system:
+        'You are a nutrition expert. Calculate nutrition for the given ingredients and return ONLY valid JSON (no markdown) in this exact format: { "dish": "name", "totalCalories": 450, "confidence": "high", "items": [{ "name": "chicken breast", "amount": "150g", "calories": 165 }], "macros": { "protein": 35, "carbs": 40, "fat": 12 }, "tip": "short health tip" }',
+      messages: [
+        {
+          role: 'user',
+          content: `Recalculate nutrition for "${dish}" with these ingredients: ${ingredientList}. Return only JSON.`,
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`API error ${response.status}: ${err}`)
+  }
+
+  const data = await response.json()
+  return JSON.parse(data.content[0].text) as AnalysisResult
+}
+
 // ── Daily log helpers ──────────────────────────────────────────────────────────
 
 const DAILY_GOAL = 2000
@@ -194,12 +231,53 @@ function ResultCard({
   result,
   imageUrl,
   onReset,
+  onRecalculate,
 }: {
   result: AnalysisResult
   imageUrl: string
   onReset: () => void
+  onRecalculate: (items: FoodItem[], dish: string) => Promise<void>
 }) {
   const macroTotal = result.macros.protein + result.macros.carbs + result.macros.fat
+  const [adjusting, setAdjusting] = useState(false)
+  const [editItems, setEditItems] = useState<FoodItem[]>(result.items)
+  const [newName, setNewName] = useState('')
+  const [newAmount, setNewAmount] = useState('')
+  const [recalcLoading, setRecalcLoading] = useState(false)
+
+  useEffect(() => {
+    setEditItems(result.items)
+    setAdjusting(false)
+  }, [result])
+
+  function updateItem(index: number, field: keyof FoodItem, value: string) {
+    setEditItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, [field]: field === 'calories' ? Number(value) : value } : item,
+      ),
+    )
+  }
+
+  function removeItem(index: number) {
+    setEditItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function addItem() {
+    if (!newName.trim()) return
+    setEditItems((prev) => [...prev, { name: newName.trim(), amount: newAmount.trim() || '1 serving', calories: 0 }])
+    setNewName('')
+    setNewAmount('')
+  }
+
+  async function handleRecalc() {
+    setRecalcLoading(true)
+    try {
+      await onRecalculate(editItems, result.dish)
+      setAdjusting(false)
+    } finally {
+      setRecalcLoading(false)
+    }
+  }
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 pb-8">
@@ -230,21 +308,89 @@ function ResultCard({
 
         {/* Ingredients */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Ingredients
-          </h3>
-          <ul className="space-y-1.5">
-            {result.items.map((item, i) => (
-              <li key={i} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-gray-700">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                  <span>{item.name}</span>
-                  <span className="text-gray-400 text-xs">({item.amount})</span>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              Ingredients
+            </h3>
+            <button
+              onClick={() => setAdjusting((v) => !v)}
+              className="text-xs text-green-600 underline hover:text-green-800 transition-colors"
+            >
+              {adjusting ? 'Cancel' : 'Adjust'}
+            </button>
+          </div>
+
+          {!adjusting ? (
+            <ul className="space-y-1.5">
+              {result.items.map((item, i) => (
+                <li key={i} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                    <span>{item.name}</span>
+                    <span className="text-gray-400 text-xs">({item.amount})</span>
+                  </div>
+                  <span className="font-semibold text-gray-800 shrink-0">{item.calories} kcal</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="space-y-2">
+              {editItems.map((item, i) => (
+                <div key={i} className="flex gap-1.5 items-center">
+                  <input
+                    value={item.name}
+                    onChange={(e) => updateItem(i, 'name', e.target.value)}
+                    placeholder="Ingredient"
+                    className="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-400"
+                  />
+                  <input
+                    value={item.amount}
+                    onChange={(e) => updateItem(i, 'amount', e.target.value)}
+                    placeholder="Amount"
+                    className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-400"
+                  />
+                  <button
+                    onClick={() => removeItem(i)}
+                    className="text-gray-300 hover:text-red-400 transition-colors text-lg leading-none px-1"
+                  >
+                    ×
+                  </button>
                 </div>
-                <span className="font-semibold text-gray-800 shrink-0">{item.calories} kcal</span>
-              </li>
-            ))}
-          </ul>
+              ))}
+
+              {/* Add new ingredient row */}
+              <div className="flex gap-1.5 items-center pt-1">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                  placeholder="+ Add ingredient"
+                  className="flex-1 min-w-0 text-sm border border-dashed border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-400"
+                />
+                <input
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                  placeholder="Amount"
+                  className="w-20 text-sm border border-dashed border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-400"
+                />
+                <button
+                  onClick={addItem}
+                  className="text-green-500 hover:text-green-700 transition-colors text-xl leading-none px-1"
+                >
+                  +
+                </button>
+              </div>
+
+              <button
+                onClick={handleRecalc}
+                disabled={recalcLoading || editItems.length === 0}
+                className="w-full py-2 rounded-xl bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-semibold text-sm transition-colors mt-1"
+              >
+                {recalcLoading ? 'Recalculating…' : 'Recalculate nutrition'}
+              </button>
+            </div>
+          )}
         </div>
 
         <hr className="border-green-50" />
@@ -469,6 +615,36 @@ export default function FoodCalorieAnalyzer() {
     [handleFile],
   )
 
+  const handleRecalculate = useCallback(
+    async (items: FoodItem[], dish: string) => {
+      setState('loading')
+      try {
+        const data = await recalculateFromIngredients(items, dish)
+        setResult(data)
+        setState('result')
+        setDailyLog((prev) => {
+          // replace the last meal entry with updated calories
+          const meals = [...prev.meals]
+          if (meals.length > 0) {
+            meals[meals.length - 1] = {
+              ...meals[meals.length - 1],
+              dish: data.dish,
+              calories: data.totalCalories,
+            }
+          }
+          const updated = { ...prev, meals }
+          saveDailyLog(updated)
+          return updated
+        })
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Something went wrong.'
+        setErrorMsg(msg)
+        setState('error')
+      }
+    },
+    [],
+  )
+
   const handleClearDay = useCallback(() => {
     const fresh: DailyLog = { date: todayStr(), meals: [] }
     saveDailyLog(fresh)
@@ -526,7 +702,7 @@ export default function FoodCalorieAnalyzer() {
         )}
 
         {state === 'result' && result && (
-          <ResultCard result={result} imageUrl={imageUrl} onReset={handleReset} />
+          <ResultCard result={result} imageUrl={imageUrl} onReset={handleReset} onRecalculate={handleRecalculate} />
         )}
 
         {state === 'error' && (
