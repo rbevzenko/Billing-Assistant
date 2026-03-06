@@ -15,6 +15,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       await signIn(email, password)
+      window.location.href = import.meta.env.BASE_URL || '/'
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setError(msg || 'Ошибка соединения с сервером. Проверьте интернет и попробуйте снова.')
