@@ -8,8 +8,9 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (loading) return
     setError('')
     setLoading(true)
     try {
@@ -52,7 +53,13 @@ export function LoginPage() {
             />
           </div>
           {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
-          <button type="submit" className="btn btn-primary btn-md" style={{ width: '100%' }} disabled={loading}>
+          <button
+            type="button"
+            className="btn btn-primary btn-md"
+            style={{ width: '100%', touchAction: 'manipulation' }}
+            disabled={loading}
+            onClick={() => handleSubmit()}
+          >
             {loading ? 'Вход...' : 'Войти'}
           </button>
         </form>
