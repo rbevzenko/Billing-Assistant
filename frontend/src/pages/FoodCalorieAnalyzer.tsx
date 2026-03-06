@@ -25,6 +25,18 @@ interface AnalysisResult {
 
 type AppState = 'idle' | 'loading' | 'result' | 'error'
 
+interface DailyMeal {
+  id: string
+  dish: string
+  calories: number
+  time: string
+}
+
+interface DailyLog {
+  date: string
+  meals: DailyMeal[]
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fileToBase64(file: File): Promise<string> {
@@ -87,6 +99,30 @@ async function analyzeImage(file: File): Promise<AnalysisResult> {
   const data = await response.json()
   const text: string = data.content[0].text
   return JSON.parse(text) as AnalysisResult
+}
+
+// ── Daily log helpers ──────────────────────────────────────────────────────────
+
+const DAILY_GOAL = 2000
+const STORAGE_KEY = 'foodscan_daily_log'
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function loadDailyLog(): DailyLog {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed: DailyLog = JSON.parse(raw)
+      if (parsed.date === todayStr()) return parsed
+    }
+  } catch {}
+  return { date: todayStr(), meals: [] }
+}
+
+function saveDailyLog(log: DailyLog): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(log))
 }
 
 // ── Sub-components (all inline in one file) ────────────────────────────────────
@@ -245,6 +281,53 @@ function ResultCard({
   )
 }
 
+function DailyCounter({ log, onClear }: { log: DailyLog; onClear: () => void }) {
+  const total = log.meals.reduce((sum, m) => sum + m.calories, 0)
+  const pct = Math.min(100, (total / DAILY_GOAL) * 100)
+  const over = total > DAILY_GOAL
+
+  return (
+    <div className="w-full max-w-md mx-auto mb-6 bg-white rounded-2xl shadow-sm border border-green-100 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-gray-600">Today's calories</span>
+        <button
+          onClick={onClear}
+          className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+        >
+          Reset day
+        </button>
+      </div>
+
+      <div className="flex items-end gap-1 mb-2">
+        <span className={`text-3xl font-extrabold leading-none ${over ? 'text-red-500' : 'text-green-600'}`}>
+          {total}
+        </span>
+        <span className="text-gray-400 text-sm mb-0.5">/ {DAILY_GOAL} kcal</span>
+      </div>
+
+      <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
+        <div
+          className={`h-2 rounded-full transition-all duration-700 ${over ? 'bg-red-400' : 'bg-green-400'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {log.meals.length > 0 ? (
+        <ul className="space-y-1">
+          {log.meals.map((m) => (
+            <li key={m.id} className="flex justify-between text-xs text-gray-500">
+              <span className="truncate mr-2">{m.dish}</span>
+              <span className="shrink-0 font-medium text-gray-700">{m.calories} kcal · {m.time}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-gray-400 text-center">No meals logged yet today</p>
+      )}
+    </div>
+  )
+}
+
 function UploadZone({
   onFile,
   isDragging,
@@ -328,6 +411,7 @@ export default function FoodCalorieAnalyzer() {
   const [imageUrl, setImageUrl] = useState<string>('')
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [isDragging, setIsDragging] = useState(false)
+  const [dailyLog, setDailyLog] = useState<DailyLog>(() => loadDailyLog())
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -345,6 +429,22 @@ export default function FoodCalorieAnalyzer() {
       const data = await analyzeImage(file)
       setResult(data)
       setState('result')
+      setDailyLog((prev) => {
+        const updated: DailyLog = {
+          ...prev,
+          meals: [
+            ...prev.meals,
+            {
+              id: Date.now().toString(),
+              dish: data.dish,
+              calories: data.totalCalories,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ],
+        }
+        saveDailyLog(updated)
+        return updated
+      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong.'
       setErrorMsg(msg)
@@ -369,6 +469,12 @@ export default function FoodCalorieAnalyzer() {
     [handleFile],
   )
 
+  const handleClearDay = useCallback(() => {
+    const fresh: DailyLog = { date: todayStr(), meals: [] }
+    saveDailyLog(fresh)
+    setDailyLog(fresh)
+  }, [])
+
   const handleReset = useCallback(() => {
     setResult(null)
     setImageUrl('')
@@ -387,6 +493,9 @@ export default function FoodCalorieAnalyzer() {
           Upload a food photo — get instant nutrition insights
         </p>
       </div>
+
+      {/* Daily counter */}
+      <DailyCounter log={dailyLog} onClear={handleClearDay} />
 
       {/* Content */}
       <div className="w-full max-w-md mx-auto">
