@@ -1052,6 +1052,10 @@ tr.row-selected td {
   border-left: 3px solid var(--danger);
 }
 
+.stat-card--success {
+  border-left: 3px solid #22c55e;
+}
+
 .dashboard-lists {
   display: grid;
   grid-template-columns: 2fr 1fr;
