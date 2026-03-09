@@ -226,7 +226,7 @@ export function ProfilePage() {
               className={`btn btn-sm ${tab === p.id ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setTab(p.id)}
             >
-              {p.type === 'eu' ? '🌍' : '🇷🇺'} {p.label}{activeId === p.id ? ' ✓' : ''}
+              {(p.default_currency === 'EUR' || p.default_currency === 'USD') ? 'EU' : '🇷🇺'} {p.label}{activeId === p.id ? ' ✓' : ''}
             </button>
           ))}
           {!profiles.find(p => p.type === 'ru') && (
