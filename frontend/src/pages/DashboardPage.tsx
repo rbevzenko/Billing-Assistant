@@ -5,16 +5,11 @@ import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
 import { useLanguage } from '@/i18n/translations'
 import type { Currency, DashboardData, InvoiceStatus, TimeEntryStatus } from '@/types'
 
-function fmt(n: number): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
-}
-
-function fmtMoney(n: number): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-}
-
 export function DashboardPage() {
   const { lang, t } = useLanguage()
+  const locale = lang === 'en' ? 'en-US' : 'ru-RU'
+  const fmt = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+  const fmtMoney = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [unbilledCurrency, setUnbilledCurrency] = useState<Currency>('RUB')
