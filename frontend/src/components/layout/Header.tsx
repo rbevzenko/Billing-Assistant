@@ -15,8 +15,8 @@ export function Header() {
   return (
     <header className="header">
       <h1 className="header-title">{title}</h1>
-      <button className="btn btn-ghost btn-sm" onClick={signOut} title="Выйти">
-        Выйти
+      <button className="btn btn-ghost btn-sm" onClick={signOut} title={t.common.logout}>
+        {t.common.logout}
       </button>
     </header>
   )

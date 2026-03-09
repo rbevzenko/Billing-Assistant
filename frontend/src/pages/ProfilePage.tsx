@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { profileService } from '@/services/profile'
 import { useToast } from '@/context/ToastContext'
+import { useLanguage } from '@/i18n/translations'
 import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
@@ -162,6 +163,7 @@ function ProfileForm({
 
 export function ProfilePage() {
   const { addToast } = useToast()
+  const { setLang } = useLanguage()
   const [profiles, setProfiles] = useState<LawyerProfile[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -181,7 +183,7 @@ export function ProfilePage() {
   const handleSave = async (data: LawyerProfileUpdate, id?: number) => {
     try {
       const saved = await profileService.upsert(data, id)
-      addToast('success', 'Профиль сохранён')
+      addToast('success', 'Профиль сохранён / Profile saved')
       setTab(saved.id)
       reload()
     } catch (err: any) {
@@ -202,7 +204,10 @@ export function ProfilePage() {
   const handleSetActive = (id: number) => {
     profileService.setActive(id)
     setActiveId(id)
-    addToast('success', 'Активный профиль обновлён')
+    // Auto-sync app language with the activated profile's document language
+    const profile = profiles.find(p => p.id === id)
+    if (profile?.language) setLang(profile.language)
+    addToast('success', 'Активный профиль обновлён / Active profile updated')
   }
 
   if (loading) return <div className="loading-text">Загрузка...</div>

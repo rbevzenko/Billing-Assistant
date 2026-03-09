@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { clientsService } from '@/services/clients'
 import { useToast } from '@/context/ToastContext'
+import { useLanguage } from '@/i18n/translations'
 import { Table } from '@/components/ui/Table'
 import { Pagination } from '@/components/ui/Pagination'
 import { Button } from '@/components/ui/Button'
@@ -26,6 +27,7 @@ function ClientForm({
   onCancel: () => void
   loading: boolean
 }) {
+  const { t } = useLanguage()
   const [form, setForm] = useState<ClientCreate>(initial)
   const firstRef = useRef<HTMLInputElement>(null)
 
@@ -40,21 +42,21 @@ function ClientForm({
   return (
     <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
       <div className="form-grid">
-        <Input ref={firstRef} label="Название *" value={form.name} onChange={set('name')} required />
-        <Input label="Контактное лицо" value={form.contact_person ?? ''} onChange={set('contact_person')} />
+        <Input ref={firstRef} label={t.clients.nameLabel} value={form.name} onChange={set('name')} required />
+        <Input label={t.clients.contactLabel} value={form.contact_person ?? ''} onChange={set('contact_person')} />
         <Input label="Email" type="email" value={form.email ?? ''} onChange={set('email')} />
-        <Input label="Телефон" value={form.phone ?? ''} onChange={set('phone')} />
-        <Input label="ИНН" value={form.inn ?? ''} onChange={set('inn')} maxLength={12} />
-        <Input label="Банк" value={form.bank_name ?? ''} onChange={set('bank_name')} />
-        <Input label="БИК" value={form.bik ?? ''} onChange={set('bik')} maxLength={9} />
-        <Input label="Расчётный счёт" value={form.checking_account ?? ''} onChange={set('checking_account')} maxLength={20} />
-        <Input label="Корр. счёт" value={form.correspondent_account ?? ''} onChange={set('correspondent_account')} maxLength={20} />
+        <Input label={t.clients.phoneLabel} value={form.phone ?? ''} onChange={set('phone')} />
+        <Input label={t.clients.innLabel} value={form.inn ?? ''} onChange={set('inn')} maxLength={12} />
+        <Input label={t.clients.bankLabel} value={form.bank_name ?? ''} onChange={set('bank_name')} />
+        <Input label={t.clients.bikLabel} value={form.bik ?? ''} onChange={set('bik')} maxLength={9} />
+        <Input label={t.clients.accountLabel} value={form.checking_account ?? ''} onChange={set('checking_account')} maxLength={20} />
+        <Input label={t.clients.corrAccountLabel} value={form.correspondent_account ?? ''} onChange={set('correspondent_account')} maxLength={20} />
       </div>
-      <Textarea label="Адрес" value={form.address ?? ''} onChange={set('address')} rows={2} />
-      <Textarea label="Примечания" value={form.notes ?? ''} onChange={set('notes')} rows={2} />
+      <Textarea label={t.clients.addressLabel} value={form.address ?? ''} onChange={set('address')} rows={2} />
+      <Textarea label={t.clients.notesLabel} value={form.notes ?? ''} onChange={set('notes')} rows={2} />
       <div className="modal-actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>Отмена</Button>
-        <Button type="submit" loading={loading}>Сохранить</Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>{t.common.cancel}</Button>
+        <Button type="submit" loading={loading}>{t.common.save}</Button>
       </div>
     </form>
   )
@@ -62,6 +64,7 @@ function ClientForm({
 
 export function ClientsPage() {
   const { addToast } = useToast()
+  const { t } = useLanguage()
   const [data, setData] = useState<Page<Client> | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -76,13 +79,13 @@ export function ClientsPage() {
     setLoading(true)
     clientsService.list({ search: search || undefined, page, size: 20 })
       .then(setData)
-      .catch(() => addToast('error', 'Ошибка загрузки клиентов'))
+      .catch(() => addToast('error', t.common.error))
       .finally(() => setLoading(false))
-  }, [search, page, addToast])
+  }, [search, page, addToast, t])
 
   useEffect(() => {
-    const t = setTimeout(load, search ? 400 : 0)
-    return () => clearTimeout(t)
+    const timer = setTimeout(load, search ? 400 : 0)
+    return () => clearTimeout(timer)
   }, [load, search])
 
   const handleSave = async (formData: ClientCreate) => {
@@ -90,16 +93,16 @@ export function ClientsPage() {
     try {
       if (editClient) {
         await clientsService.update(editClient.id, formData)
-        addToast('success', 'Клиент обновлён')
+        addToast('success', t.clients.updatedToast)
       } else {
         await clientsService.create(formData)
-        addToast('success', 'Клиент создан')
+        addToast('success', t.clients.createdToast)
       }
       setShowForm(false)
       setEditClient(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Ошибка сохранения')
+      addToast('error', err.message || t.common.error)
     } finally {
       setFormLoading(false)
     }
@@ -110,11 +113,11 @@ export function ClientsPage() {
     setDeleteLoading(true)
     try {
       await clientsService.delete(deleteClient.id)
-      addToast('success', 'Клиент удалён')
+      addToast('success', t.clients.deletedToast)
       setDeleteClient(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Не удалось удалить клиента')
+      addToast('error', err.message || t.common.error)
     } finally {
       setDeleteLoading(false)
     }
@@ -131,16 +134,16 @@ export function ClientsPage() {
   }
 
   const columns: Column<Client>[] = [
-    { key: 'name', label: 'Название' },
-    { key: 'contact_person', label: 'Контактное лицо', render: r => r.contact_person ?? '—' },
+    { key: 'name', label: t.clients.nameCol },
+    { key: 'contact_person', label: t.clients.contactCol, render: r => r.contact_person ?? '—' },
     { key: 'email', label: 'Email', render: r => r.email ?? '—' },
-    { key: 'phone', label: 'Телефон', render: r => r.phone ?? '—' },
-    { key: 'inn', label: 'ИНН', render: r => r.inn ?? '—' },
+    { key: 'phone', label: t.clients.phoneCol, render: r => r.phone ?? '—' },
+    { key: 'inn', label: t.clients.innCol, render: r => r.inn ?? '—' },
     {
       key: 'actions', label: '', render: r => (
         <div className="table-actions">
-          <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>Изменить</Button>
-          <Button size="sm" variant="danger" onClick={() => setDeleteClient(r)}>Удалить</Button>
+          <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>{t.common.edit}</Button>
+          <Button size="sm" variant="danger" onClick={() => setDeleteClient(r)}>{t.common.delete}</Button>
         </div>
       ),
     },
@@ -151,11 +154,11 @@ export function ClientsPage() {
       <div className="page-toolbar">
         <input
           className="search-input"
-          placeholder="Поиск клиентов..."
+          placeholder={t.clients.searchPlaceholder}
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
         />
-        <Button onClick={openCreate}>+ Добавить клиента</Button>
+        <Button onClick={openCreate}>{t.clients.addBtn}</Button>
       </div>
 
       <div className="card">
@@ -164,7 +167,7 @@ export function ClientsPage() {
           data={data?.items ?? []}
           keyExtractor={r => r.id}
           loading={loading}
-          emptyMessage="Клиенты не найдены. Нажмите «+ Добавить клиента» чтобы начать."
+          emptyMessage={t.clients.emptyMessage}
         />
         <Pagination
           page={page}
@@ -177,7 +180,7 @@ export function ClientsPage() {
       <Modal
         isOpen={showForm}
         onClose={() => { setShowForm(false); setEditClient(null) }}
-        title={editClient ? 'Редактировать клиента' : 'Новый клиент'}
+        title={editClient ? t.clients.editModal : t.clients.createModal}
         size="lg"
       >
         <ClientForm
@@ -204,8 +207,8 @@ export function ClientsPage() {
         isOpen={!!deleteClient}
         onClose={() => setDeleteClient(null)}
         onConfirm={handleDelete}
-        title="Удалить клиента"
-        message={`Вы уверены, что хотите удалить клиента «${deleteClient?.name}»? Это действие нельзя отменить.`}
+        title={t.clients.deleteTitle}
+        message={`${t.clients.deleteConfirm} «${deleteClient?.name}»? ${t.clients.deleteConfirm2}`}
         loading={deleteLoading}
       />
     </div>

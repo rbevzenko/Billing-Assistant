@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { dashboardService } from '@/services/dashboard'
 import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
+import { useLanguage } from '@/i18n/translations'
 import type { Currency, DashboardData, InvoiceStatus, TimeEntryStatus } from '@/types'
 
 function fmt(n: number): string {
@@ -12,25 +13,8 @@ function fmtMoney(n: number): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
-const STATUS_LABEL: Record<TimeEntryStatus | InvoiceStatus, string> = {
-  draft: 'Черновик',
-  confirmed: 'Подтверждено',
-  billed: 'Выставлен',
-  sent: 'Отправлен',
-  paid: 'Оплачен',
-  overdue: 'Просрочен',
-}
-
-const STATUS_CLASS: Record<TimeEntryStatus | InvoiceStatus, string> = {
-  draft: 'badge-draft',
-  confirmed: 'badge-confirmed',
-  billed: 'badge-billed',
-  sent: 'badge-sent',
-  paid: 'badge-paid',
-  overdue: 'badge-overdue',
-}
-
 export function DashboardPage() {
+  const { lang, t } = useLanguage()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [unbilledCurrency, setUnbilledCurrency] = useState<Currency>('RUB')
@@ -66,13 +50,31 @@ export function DashboardPage() {
       .catch(() => setPaidConverted({ amount: 0, loading: false }))
   }, [data, paidCurrency, paidPeriod])
 
-  if (loading) return <span className="loading-text">Загрузка…</span>
+  if (loading) return <span className="loading-text">{t.common.loading}</span>
 
   if (!data) return (
     <div className="card">
-      <p style={{ color: 'var(--text-secondary)' }}>Не удалось загрузить данные дашборда.</p>
+      <p style={{ color: 'var(--text-secondary)' }}>{t.dashboard.loadFailed}</p>
     </div>
   )
+
+  const STATUS_LABEL: Record<TimeEntryStatus | InvoiceStatus, string> = {
+    draft: t.status.draft,
+    confirmed: t.status.confirmed,
+    billed: t.status.billed,
+    sent: t.status.sent,
+    paid: t.status.paid,
+    overdue: t.status.overdue,
+  }
+
+  const STATUS_CLASS: Record<TimeEntryStatus | InvoiceStatus, string> = {
+    draft: 'badge-draft',
+    confirmed: 'badge-confirmed',
+    billed: 'badge-billed',
+    sent: 'badge-sent',
+    paid: 'badge-paid',
+    overdue: 'badge-overdue',
+  }
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -81,23 +83,23 @@ export function DashboardPage() {
       {/* ── Metric cards ─────────────────────────────────────────────────── */}
       <div className="dashboard-grid">
         <div className="stat-card">
-          <div className="stat-label">Часы за неделю</div>
+          <div className="stat-label">{t.dashboard.hoursWeek}</div>
           <div className="stat-value">{fmt(data.hours_this_week)}</div>
-          <div className="stat-sub">с понедельника</div>
+          <div className="stat-sub">{t.dashboard.sinceMonday}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Часы за месяц</div>
+          <div className="stat-label">{t.dashboard.hoursMonth}</div>
           <div className="stat-value">{fmt(data.hours_this_month)}</div>
-          <div className="stat-sub">текущий месяц</div>
+          <div className="stat-sub">{t.dashboard.currentMonth}</div>
         </div>
         <div className="stat-card stat-card--warning">
-          <div className="stat-label">Не выставлено счетов</div>
+          <div className="stat-label">{t.dashboard.unbilled}</div>
           <div className="stat-value stat-value--sm">
             {unbilledConverted.loading
               ? '…'
               : `${fmtMoney(unbilledConverted.amount)} ${CURRENCY_SYMBOL[unbilledCurrency]}`}
           </div>
-          <div className="stat-sub">подтверждённые</div>
+          <div className="stat-sub">{t.dashboard.confirmedLabel}</div>
           <div className="lang-switcher" style={{ padding: '4px 0 0' }}>
             {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
               <button
@@ -112,7 +114,7 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="stat-card stat-card--success">
-          <div className="stat-label">Оплаченные счета</div>
+          <div className="stat-label">{t.dashboard.paidInvoices}</div>
           <div className="stat-value stat-value--sm">
             {paidConverted.loading
               ? '…'
@@ -126,7 +128,7 @@ export function DashboardPage() {
                 onClick={() => setPaidPeriod(p)}
                 style={{ fontSize: 10, padding: '2px 5px' }}
               >
-                {p === 'month' ? 'Месяц' : 'Год'}
+                {p === 'month' ? t.dashboard.month : t.dashboard.year}
               </button>
             ))}
           </div>
@@ -144,12 +146,12 @@ export function DashboardPage() {
           </div>
         </div>
         <div className={`stat-card ${data.overdue_invoices_count > 0 ? 'stat-card--danger' : ''}`}>
-          <div className="stat-label">Просроченных счетов</div>
+          <div className="stat-label">{t.dashboard.overdueInvoices}</div>
           <div className="stat-value">{data.overdue_invoices_count}</div>
           <div className="stat-sub">
             {data.unpaid_amount > 0
-              ? `${fmtMoney(data.unpaid_amount)} ₽ не оплачено`
-              : 'всё в порядке'}
+              ? `${fmtMoney(data.unpaid_amount)} ₽ ${t.dashboard.unpaid}`
+              : t.dashboard.allGood}
           </div>
         </div>
       </div>
@@ -159,20 +161,20 @@ export function DashboardPage() {
         {/* Recent time entries */}
         <div className="card dash-list-card">
           <div className="card-header">
-            <h2 className="card-title">Последние записи времени</h2>
-            <Link to="/time-entries" className="btn btn-sm btn-ghost">Все →</Link>
+            <h2 className="card-title">{t.dashboard.recentEntries}</h2>
+            <Link to="/time-entries" className="btn btn-sm btn-ghost">{t.dashboard.allBtn}</Link>
           </div>
           {data.recent_time_entries.length === 0 ? (
-            <p className="dash-empty">Записей нет</p>
+            <p className="dash-empty">{t.dashboard.noEntries}</p>
           ) : (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Дата</th>
-                  <th>Клиент / Проект</th>
-                  <th>Описание</th>
-                  <th className="td-num">Часы</th>
-                  <th>Статус</th>
+                  <th>{t.common.date}</th>
+                  <th>{t.dashboard.clientProject}</th>
+                  <th>{t.common.description}</th>
+                  <th className="td-num">{t.common.hours}</th>
+                  <th>{t.common.status}</th>
                 </tr>
               </thead>
               <tbody>
@@ -200,20 +202,20 @@ export function DashboardPage() {
         {/* Recent invoices */}
         <div className="card dash-list-card">
           <div className="card-header">
-            <h2 className="card-title">Последние счета</h2>
-            <Link to="/invoices" className="btn btn-sm btn-ghost">Все →</Link>
+            <h2 className="card-title">{t.dashboard.recentInvoices}</h2>
+            <Link to="/invoices" className="btn btn-sm btn-ghost">{t.dashboard.allBtn}</Link>
           </div>
           {data.recent_invoices.length === 0 ? (
-            <p className="dash-empty">Счетов нет</p>
+            <p className="dash-empty">{t.dashboard.noInvoices}</p>
           ) : (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Номер</th>
-                  <th>Клиент</th>
-                  <th>До</th>
-                  <th className="td-num">Сумма</th>
-                  <th>Статус</th>
+                  <th>{t.dashboard.number}</th>
+                  <th>{t.common.client}</th>
+                  <th>{t.dashboard.due}</th>
+                  <th className="td-num">{t.common.amount}</th>
+                  <th>{t.common.status}</th>
                 </tr>
               </thead>
               <tbody>
