@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { reportsService } from '@/services/reports'
 import { clientsService } from '@/services/clients'
+import { useLanguage } from '@/i18n/translations'
 import type { Client, ReportData } from '@/types'
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
@@ -39,14 +40,6 @@ function firstOfYear(): string {
 
 type Preset = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom'
 
-const PRESETS: { id: Preset; label: string }[] = [
-  { id: 'this_month', label: 'Текущий месяц' },
-  { id: 'last_month', label: 'Прошлый месяц' },
-  { id: 'this_quarter', label: 'Текущий квартал' },
-  { id: 'this_year', label: 'Текущий год' },
-  { id: 'custom', label: 'Произвольный' },
-]
-
 function presetDates(preset: Preset): { from: string; to: string } {
   switch (preset) {
     case 'this_month':   return { from: firstOfMonth(), to: todayStr() }
@@ -59,10 +52,6 @@ function presetDates(preset: Preset): { from: string; to: string } {
 
 // ── Formatting ─────────────────────────────────────────────────────────────────
 
-function fmtMoney(n: number): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-}
-
 function fmtHours(n: number): string {
   return n.toFixed(1)
 }
@@ -70,6 +59,22 @@ function fmtHours(n: number): string {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function ReportsPage() {
+  const { lang, t } = useLanguage()
+
+  const PRESETS: { id: Preset; label: string }[] = [
+    { id: 'this_month', label: t.reports.thisMonth },
+    { id: 'last_month', label: t.reports.lastMonth },
+    { id: 'this_quarter', label: t.reports.thisQuarter },
+    { id: 'this_year', label: t.reports.thisYear },
+    { id: 'custom', label: t.reports.custom },
+  ]
+
+  const locale = lang === 'en' ? 'en-US' : 'ru-RU'
+
+  function fmtMoney(n: number): string {
+    return n.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  }
+
   const [clients, setClients] = useState<Client[]>([])
   const [preset, setPreset] = useState<Preset>('this_month')
   const [dateFrom, setDateFrom] = useState(firstOfMonth())
@@ -120,12 +125,14 @@ export function ReportsPage() {
     })
   }
 
+  const hoursUnit = lang === 'en' ? 'h' : 'ч'
+
   return (
     <div>
       {/* ── Filters ──────────────────────────────────────────────────────── */}
       <div className="card report-filters-card">
         <div className="card-header">
-          <h2 className="card-title">Отчёт по времени и биллингу</h2>
+          <h2 className="card-title">{t.reports.title}</h2>
         </div>
 
         {/* Preset buttons */}
@@ -144,7 +151,7 @@ export function ReportsPage() {
         {/* Date + client row */}
         <div className="report-filter-row">
           <div className="form-group">
-            <label className="form-label">Начало периода</label>
+            <label className="form-label">{t.reports.periodStart}</label>
             <input
               type="date"
               className="form-control"
@@ -153,7 +160,7 @@ export function ReportsPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Конец периода</label>
+            <label className="form-label">{t.reports.periodEnd}</label>
             <input
               type="date"
               className="form-control"
@@ -162,13 +169,13 @@ export function ReportsPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Клиент</label>
+            <label className="form-label">{t.common.client}</label>
             <select
               className="form-control"
               value={clientId ?? ''}
               onChange={e => setClientId(e.target.value ? Number(e.target.value) : null)}
             >
-              <option value="">Все клиенты</option>
+              <option value="">{t.common.allClients}</option>
               {clients.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
@@ -176,11 +183,11 @@ export function ReportsPage() {
           </div>
           <div className="report-filter-actions">
             <button className="btn btn-primary" onClick={handleLoad} disabled={loading}>
-              {loading ? 'Загрузка…' : 'Сформировать'}
+              {loading ? t.reports.generating : t.reports.generate}
             </button>
             {report && (
               <button className="btn btn-outline" onClick={handlePdf} disabled={pdfLoading}>
-                {pdfLoading ? 'Генерация…' : '⬇ PDF'}
+                {pdfLoading ? t.reports.pdfGenerating : t.reports.pdf}
               </button>
             )}
           </div>
@@ -193,19 +200,19 @@ export function ReportsPage() {
           {/* Summary cards */}
           <div className="dashboard-grid" style={{ marginTop: 20 }}>
             <div className="stat-card">
-              <div className="stat-label">Всего часов</div>
+              <div className="stat-label">{t.reports.totalHours}</div>
               <div className="stat-value">{fmtHours(report.total_hours)}</div>
             </div>
             <div className="stat-card stat-card--warning">
-              <div className="stat-label">Сумма к биллингу</div>
+              <div className="stat-label">{t.reports.billingAmount}</div>
               <div className="stat-value stat-value--sm">{fmtMoney(report.total_amount)} ₽</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Счетов выставлено</div>
+              <div className="stat-label">{t.reports.invoicesIssued}</div>
               <div className="stat-value">{report.invoice_summary.count_total}</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Оплачено</div>
+              <div className="stat-label">{t.reports.paid}</div>
               <div className="stat-value stat-value--sm">{fmtMoney(report.invoice_summary.total_paid)} ₽</div>
             </div>
           </div>
@@ -214,7 +221,7 @@ export function ReportsPage() {
           {report.breakdown.length > 0 && (
             <div className="card" style={{ marginTop: 20 }}>
               <div className="card-header">
-                <h2 className="card-title">Детализация по клиентам и проектам</h2>
+                <h2 className="card-title">{t.reports.breakdownTitle}</h2>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                   {dateFrom} — {dateTo}
                 </span>
@@ -222,10 +229,10 @@ export function ReportsPage() {
               <table className="table report-breakdown-table">
                 <thead>
                   <tr>
-                    <th>Клиент / Проект</th>
-                    <th>Записей</th>
-                    <th className="td-num">Часы</th>
-                    <th className="td-num">Сумма, ₽</th>
+                    <th>{t.reports.clientProjectCol}</th>
+                    <th>{t.reports.entriesCol}</th>
+                    <th className="td-num">{t.reports.hoursCol}</th>
+                    <th className="td-num">{t.reports.amountCol}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,9 +273,9 @@ export function ReportsPage() {
                 </tbody>
                 <tfoot>
                   <tr className="report-total-row">
-                    <td><strong>ИТОГО</strong></td>
+                    <td><strong>{t.reports.breakdownTotal}</strong></td>
                     <td></td>
-                    <td className="td-num"><strong>{fmtHours(report.total_hours)} ч</strong></td>
+                    <td className="td-num"><strong>{fmtHours(report.total_hours)} {hoursUnit}</strong></td>
                     <td className="td-num"><strong>{fmtMoney(report.total_amount)} ₽</strong></td>
                   </tr>
                 </tfoot>
@@ -279,33 +286,33 @@ export function ReportsPage() {
           {/* Invoice summary */}
           <div className="card" style={{ marginTop: 20 }}>
             <div className="card-header">
-              <h2 className="card-title">Сводка по счетам</h2>
+              <h2 className="card-title">{t.reports.invoiceSummaryTitle}</h2>
             </div>
             {report.invoice_summary.count_total === 0 ? (
-              <p className="dash-empty">Счетов за период нет</p>
+              <p className="dash-empty">{t.reports.noInvoices}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Статус</th>
-                    <th className="td-num">Количество</th>
-                    <th className="td-num">Сумма, ₽</th>
+                    <th>{t.reports.statusCol}</th>
+                    <th className="td-num">{t.reports.countCol}</th>
+                    <th className="td-num">{t.reports.amountCol}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td><span className="badge badge-paid">Оплачено</span></td>
+                    <td><span className="badge badge-paid">{t.reports.paidStatus}</span></td>
                     <td className="td-num">{report.invoice_summary.count_paid}</td>
                     <td className="td-num">{fmtMoney(report.invoice_summary.total_paid)}</td>
                   </tr>
                   <tr>
-                    <td><span className="badge badge-sent">Не оплачено</span></td>
+                    <td><span className="badge badge-sent">{t.reports.unpaidStatus}</span></td>
                     <td className="td-num">{report.invoice_summary.count_unpaid}</td>
                     <td className="td-num">{fmtMoney(report.invoice_summary.total_unpaid)}</td>
                   </tr>
                   {report.invoice_summary.count_overdue > 0 && (
                     <tr>
-                      <td><span className="badge badge-overdue">Просрочено</span></td>
+                      <td><span className="badge badge-overdue">{t.reports.overdueStatus}</span></td>
                       <td className="td-num">{report.invoice_summary.count_overdue}</td>
                       <td className="td-num">—</td>
                     </tr>
@@ -313,7 +320,7 @@ export function ReportsPage() {
                 </tbody>
                 <tfoot>
                   <tr className="report-total-row">
-                    <td><strong>Всего выставлено</strong></td>
+                    <td><strong>{t.reports.totalIssued}</strong></td>
                     <td className="td-num"><strong>{report.invoice_summary.count_total}</strong></td>
                     <td className="td-num"><strong>{fmtMoney(report.invoice_summary.total_invoiced)}</strong></td>
                   </tr>
@@ -326,7 +333,7 @@ export function ReportsPage() {
 
       {!report && !loading && (
         <div className="card" style={{ marginTop: 20 }}>
-          <p className="dash-empty">Выберите период и нажмите «Сформировать»</p>
+          <p className="dash-empty">{t.reports.selectPrompt}</p>
         </div>
       )}
     </div>

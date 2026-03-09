@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InvoiceStatusBadge } from '@/components/ui/Badge'
 import { CURRENCY_SYMBOL } from '@/services/exchange'
-import { TRANSLATIONS } from '@/i18n/translations'
+import { TRANSLATIONS, useLanguage } from '@/i18n/translations'
 import type { Client, Invoice, LawyerProfile } from '@/types'
 
 function fmtDate(s: string, lang: 'ru' | 'en') {
@@ -19,6 +19,7 @@ export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addToast } = useToast()
+  const { lang: appLang, t } = useLanguage()
 
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [client, setClient] = useState<Client | null>(null)
@@ -41,45 +42,46 @@ export function InvoiceDetailPage() {
         setClient(cl)
         setProfile(pr ?? await profileService.getActive())
       })
-      .catch(() => addToast('error', 'Счёт не найден'))
+      .catch(() => addToast('error', t.invoiceDetail.notFound))
       .finally(() => setLoading(false))
   }, [id, addToast])
 
   const handleSend = async () => {
     if (!invoice) return
     setActionLoading(true)
-    try { setInvoice(await invoicesService.send(invoice.id)); addToast('success', 'Статус: Отправлен') }
-    catch { addToast('error', 'Ошибка') }
+    try { setInvoice(await invoicesService.send(invoice.id)); addToast('success', t.invoiceDetail.sentToast) }
+    catch { addToast('error', t.common.error) }
     finally { setActionLoading(false) }
   }
 
   const handlePay = async () => {
     if (!invoice) return
     setActionLoading(true)
-    try { setInvoice(await invoicesService.pay(invoice.id)); addToast('success', 'Статус: Оплачен') }
-    catch { addToast('error', 'Ошибка') }
+    try { setInvoice(await invoicesService.pay(invoice.id)); addToast('success', t.invoiceDetail.paidToast) }
+    catch { addToast('error', t.common.error) }
     finally { setActionLoading(false) }
   }
 
   const handleDelete = async () => {
     if (!invoice) return
     setActionLoading(true)
-    try { await invoicesService.delete(invoice.id); addToast('success', 'Счёт удалён'); navigate('/invoices') }
-    catch { addToast('error', 'Не удалось удалить счёт'); setActionLoading(false) }
+    try { await invoicesService.delete(invoice.id); addToast('success', t.invoiceDetail.deletedToast); navigate('/invoices') }
+    catch { addToast('error', t.invoiceDetail.deleteError); setActionLoading(false) }
   }
 
   const handleDownloadPdf = useCallback(async () => {
     if (!invoice) return
     setPdfLoading(true)
     try { await invoicesService.downloadPdf(invoice.id, invoice.invoice_number) }
-    catch { addToast('error', 'Ошибка генерации PDF') }
+    catch { addToast('error', t.common.error) }
     finally { setPdfLoading(false) }
   }, [invoice, addToast])
 
-  if (loading) return <div className="loading-text">Загрузка...</div>
-  if (!invoice) return <div className="loading-text">Счёт не найден</div>
+  if (loading) return <div className="loading-text">{t.common.loading}</div>
+  if (!invoice) return <div className="loading-text">{t.invoiceDetail.notFound}</div>
 
-  const lang = profile?.language ?? 'ru'
+  // Document language = app language (EN button = master switch for everything including docs)
+  const lang = appLang
   const T = TRANSLATIONS[lang]
   const sym = CURRENCY_SYMBOL[invoice.currency ?? 'RUB']
   const fmt = (n: string | number) =>
@@ -95,15 +97,15 @@ export function InvoiceDetailPage() {
   return (
     <div className="invoice-detail">
       <div className="invoice-action-bar no-print">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')}>← Назад</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')}>{t.invoiceDetail.back}</Button>
         <div className="table-actions">
-          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} loading={pdfLoading}>⬇ Скачать PDF</Button>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} loading={pdfLoading}>{t.invoiceDetail.downloadPdf}</Button>
           {invoice.status === 'draft' && (
-            <Button variant="secondary" size="sm" onClick={handleSend} loading={actionLoading}>Отправлен ✓</Button>
+            <Button variant="secondary" size="sm" onClick={handleSend} loading={actionLoading}>{t.invoiceDetail.markSent}</Button>
           )}
-          <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>Удалить</Button>
+          <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>{t.invoiceDetail.deleteBtn}</Button>
           {invoice.status === 'sent' && (
-            <Button variant="primary" size="sm" onClick={handlePay} loading={actionLoading}>Оплачен ✓</Button>
+            <Button variant="primary" size="sm" onClick={handlePay} loading={actionLoading}>{t.invoiceDetail.markPaid}</Button>
           )}
         </div>
       </div>
@@ -181,7 +183,7 @@ export function InvoiceDetailPage() {
                 )}
               </>
             ) : (
-              <div className="invoice-party-row" style={{ color: 'var(--text-muted)' }}>Загрузка...</div>
+              <div className="invoice-party-row" style={{ color: 'var(--text-muted)' }}>{t.invoiceDetail.loadingClient}</div>
             )}
           </div>
         </div>
@@ -218,7 +220,7 @@ export function InvoiceDetailPage() {
             </tbody>
             <tfoot>
               <tr className="table-total-row">
-                <td colSpan={3} className="total-label">{lang === 'ru' ? 'Итого:' : 'Subtotal:'}</td>
+                <td colSpan={3} className="total-label">{t.invoiceDetail.subtotalLabel}</td>
                 <td className="td-num total-value">{totalHours.toFixed(1)} h</td>
                 <td />
                 <td className="td-num total-value">{fmt(invoice.subtotal ?? invoice.total_amount)}</td>
@@ -257,8 +259,8 @@ export function InvoiceDetailPage() {
         isOpen={showDelete}
         onClose={() => setShowDelete(false)}
         onConfirm={handleDelete}
-        title="Удалить счёт"
-        message={`Удалить счёт ${invoice.invoice_number}? Записи времени вернутся в статус «Подтверждён».`}
+        title={t.invoiceDetail.deleteTitle}
+        message={`${t.invoiceDetail.deleteTitle} ${invoice.invoice_number}? ${t.invoiceDetail.deleteConfirm}`}
         loading={actionLoading}
       />
     </div>

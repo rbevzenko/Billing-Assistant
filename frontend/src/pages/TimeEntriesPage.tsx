@@ -5,18 +5,13 @@ import { clientsService } from '@/services/clients'
 import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
 import { useToast } from '@/context/ToastContext'
 import { useTimer } from '@/context/TimerContext'
+import { useLanguage } from '@/i18n/translations'
 import { Pagination } from '@/components/ui/Pagination'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { TimeStatusBadge } from '@/components/ui/Badge'
 import type { Client, Currency, Page, Project, TimeEntry, TimeEntryCreate, TimeEntryStatus, TimeEntryUpdate } from '@/types'
-
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Черновик' },
-  { value: 'confirmed', label: 'Подтверждён' },
-  { value: 'billed', label: 'Выставлен' },
-]
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -30,6 +25,13 @@ function formatElapsed(seconds: number): string {
 export function TimeEntriesPage() {
   const { addToast } = useToast()
   const timer = useTimer()
+  const { lang, t } = useLanguage()
+
+  const STATUS_OPTIONS = useMemo(() => [
+    { value: 'draft', label: t.status.draft },
+    { value: 'confirmed', label: t.status.confirmed },
+    { value: 'billed', label: t.status.billed },
+  ], [t])
 
   const [data, setData] = useState<Page<TimeEntry> | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -90,9 +92,9 @@ export function TimeEntriesPage() {
       size: 20,
     })
       .then(d => { setData(d); setSelectedIds(new Set()) })
-      .catch(() => addToast('error', 'Ошибка загрузки записей'))
+      .catch(() => addToast('error', t.common.error))
       .finally(() => setLoading(false))
-  }, [filterClient, filterProject, filterStatus, filterDateFrom, filterDateTo, page, addToast])
+  }, [filterClient, filterProject, filterStatus, filterDateFrom, filterDateTo, page, addToast, t])
 
   useEffect(() => { load() }, [load])
 
@@ -137,12 +139,12 @@ export function TimeEntriesPage() {
     }
     try {
       await timeEntriesService.create(payload)
-      addToast('success', 'Запись добавлена')
+      addToast('success', t.timeEntries.addedToast)
       setQHours('')
       setQDesc('')
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Ошибка создания записи')
+      addToast('error', err.message || t.common.error)
     } finally {
       setQLoading(false)
     }
@@ -150,7 +152,7 @@ export function TimeEntriesPage() {
 
   const handleTimerStart = () => {
     if (!qProject) {
-      addToast('info', 'Выберите проект для запуска таймера')
+      addToast('info', t.timeEntries.selectProjectTimer)
       return
     }
     timer.startTimer(Number(qProject))
@@ -177,11 +179,11 @@ export function TimeEntriesPage() {
     setEditLoading(true)
     try {
       await timeEntriesService.update(editEntry.id, editForm)
-      addToast('success', 'Запись обновлена')
+      addToast('success', t.timeEntries.updatedToast)
       setEditEntry(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Ошибка обновления')
+      addToast('error', err.message || t.common.error)
     } finally {
       setEditLoading(false)
     }
@@ -190,10 +192,10 @@ export function TimeEntriesPage() {
   const handleConfirm = async (entry: TimeEntry) => {
     try {
       await timeEntriesService.confirm(entry.id)
-      addToast('success', 'Запись подтверждена')
+      addToast('success', t.timeEntries.confirmedToast)
       load()
     } catch {
-      addToast('error', 'Ошибка подтверждения')
+      addToast('error', t.common.error)
     }
   }
 
@@ -202,11 +204,11 @@ export function TimeEntriesPage() {
     setBulkLoading(true)
     try {
       const result = await timeEntriesService.bulkConfirm(Array.from(selectedIds))
-      addToast('success', `Подтверждено: ${result.confirmed_count}`)
+      addToast('success', `${t.timeEntries.bulkConfirmed}: ${result.confirmed_count}`)
       setSelectedIds(new Set())
       load()
     } catch {
-      addToast('error', 'Ошибка массового подтверждения')
+      addToast('error', t.common.error)
     } finally {
       setBulkLoading(false)
     }
@@ -217,11 +219,11 @@ export function TimeEntriesPage() {
     setDeleteLoading(true)
     try {
       await timeEntriesService.delete(deleteEntry.id)
-      addToast('success', 'Запись удалена')
+      addToast('success', t.timeEntries.deletedToast)
       setDeleteEntry(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Не удалось удалить запись')
+      addToast('error', err.message || t.common.error)
     } finally {
       setDeleteLoading(false)
     }
@@ -290,12 +292,14 @@ export function TimeEntriesPage() {
     ? (projectMap.get(timer.projectId)?.name ?? '')
     : ''
 
+  const locale = lang === 'en' ? 'en-US' : 'ru-RU'
+
   return (
     <div>
       {/* ── Quick entry + Timer ─────────────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
-          <h2 className="card-title">Быстрое добавление</h2>
+          <h2 className="card-title">{t.timeEntries.quickAdd}</h2>
           {timer.isRunning && (
             <div className="timer-display">
               <span className="timer-dot" />
@@ -317,7 +321,7 @@ export function TimeEntriesPage() {
               required
               disabled={timer.isRunning}
             >
-              <option value="">Проект *</option>
+              <option value="">{t.timeEntries.projectPlaceholder}</option>
               {Array.from(projectsByClient.entries()).map(([clientId, projs]) => (
                 <optgroup
                   key={clientId}
@@ -347,7 +351,7 @@ export function TimeEntriesPage() {
               step="0.1"
               min="0.1"
               className="form-input"
-              placeholder="Часы *"
+              placeholder={t.timeEntries.hoursPlaceholder}
               value={qHours}
               onChange={e => setQHours(e.target.value)}
               required
@@ -357,21 +361,21 @@ export function TimeEntriesPage() {
           <div className="form-group" style={{ flex: 2, minWidth: 180 }}>
             <input
               className="form-input"
-              placeholder="Описание работы"
+              placeholder={t.timeEntries.descPlaceholder}
               value={qDesc}
               onChange={e => setQDesc(e.target.value)}
             />
           </div>
 
           <div className="quick-form-actions">
-            <Button type="submit" loading={qLoading}>Сохранить</Button>
+            <Button type="submit" loading={qLoading}>{t.common.save}</Button>
             {!timer.isRunning ? (
               <Button type="button" variant="secondary" onClick={handleTimerStart}>
-                ▶ Старт
+                {t.timeEntries.start}
               </Button>
             ) : (
               <Button type="button" variant="danger" onClick={handleTimerStop}>
-                ■ Стоп
+                {t.timeEntries.stop}
               </Button>
             )}
           </div>
@@ -390,7 +394,7 @@ export function TimeEntriesPage() {
               setPage(1)
             }}
           >
-            <option value="">Все клиенты</option>
+            <option value="">{t.common.allClients}</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
@@ -399,7 +403,7 @@ export function TimeEntriesPage() {
             value={filterProject}
             onChange={e => { setFilterProject(e.target.value); setPage(1) }}
           >
-            <option value="">Все проекты</option>
+            <option value="">{t.common.allProjects}</option>
             {filteredProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
 
@@ -408,7 +412,7 @@ export function TimeEntriesPage() {
             value={filterStatus}
             onChange={e => { setFilterStatus(e.target.value); setPage(1) }}
           >
-            <option value="">Все статусы</option>
+            <option value="">{t.common.allStatuses}</option>
             {STATUS_OPTIONS.map(s => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
@@ -419,20 +423,20 @@ export function TimeEntriesPage() {
             className="form-input filter-select"
             value={filterDateFrom}
             onChange={e => { setFilterDateFrom(e.target.value); setPage(1) }}
-            title="Дата от"
+            title={t.common.dateFrom}
           />
           <input
             type="date"
             className="form-input filter-select"
             value={filterDateTo}
             onChange={e => { setFilterDateTo(e.target.value); setPage(1) }}
-            title="Дата до"
+            title={t.common.dateTo}
           />
         </div>
 
         {selectedIds.size > 0 && (
           <Button variant="primary" loading={bulkLoading} onClick={handleBulkConfirm}>
-            Подтвердить выбранные ({selectedIds.size})
+            {t.timeEntries.confirmSelected} ({selectedIds.size})
           </Button>
         )}
       </div>
@@ -449,17 +453,17 @@ export function TimeEntriesPage() {
                     checked={allDraftSelected}
                     onChange={toggleSelectAll}
                     disabled={draftItems.length === 0}
-                    title="Выбрать все черновики"
+                    title={t.timeEntries.selectAllDrafts}
                   />
                 </th>
-                <th>Дата</th>
-                <th>Клиент</th>
-                <th>Проект</th>
-                <th>Описание</th>
-                <th>Часы</th>
-                <th>Ставка</th>
-                <th>Сумма</th>
-                <th>Статус</th>
+                <th>{t.common.date}</th>
+                <th>{t.common.client}</th>
+                <th>{t.common.project}</th>
+                <th>{t.common.description}</th>
+                <th>{t.common.hours}</th>
+                <th>{t.timeEntries.rate}</th>
+                <th>{t.timeEntries.amount}</th>
+                <th>{t.common.status}</th>
                 <th></th>
               </tr>
             </thead>
@@ -467,12 +471,12 @@ export function TimeEntriesPage() {
               {loading ? (
                 <tr>
                   <td colSpan={10} className="table-empty">
-                    <span className="loading-text">Загрузка...</span>
+                    <span className="loading-text">{t.common.loading}</span>
                   </td>
                 </tr>
               ) : (data?.items ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table-empty">Записи не найдены</td>
+                  <td colSpan={10} className="table-empty">{t.timeEntries.noEntries}</td>
                 </tr>
               ) : (
                 (data?.items ?? []).map(entry => {
@@ -501,12 +505,12 @@ export function TimeEntriesPage() {
                       <td>{client?.name ?? '—'}</td>
                       <td>{proj?.name ?? `#${entry.project_id}`}</td>
                       <td className="td-desc">{entry.description ?? '—'}</td>
-                      <td className="td-num">{hours.toFixed(1)} ч</td>
+                      <td className="td-num">{hours.toFixed(1)} {t.timeEntries.hours}</td>
                       <td className="td-num">
-                        {rate ? `${rate.toLocaleString('ru')} ${currency}` : '—'}
+                        {rate ? `${rate.toLocaleString(locale)} ${currency}` : '—'}
                       </td>
                       <td className="td-num">
-                        {rate ? `${amount.toLocaleString('ru', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}` : '—'}
+                        {rate ? `${amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}` : '—'}
                       </td>
                       <td><TimeStatusBadge status={entry.status} /></td>
                       <td>
@@ -517,7 +521,7 @@ export function TimeEntriesPage() {
                               variant="secondary"
                               onClick={() => handleConfirm(entry)}
                             >
-                              Подтвердить
+                              {t.timeEntries.confirmBtn}
                             </Button>
                           )}
                           <Button
@@ -525,7 +529,7 @@ export function TimeEntriesPage() {
                             variant="ghost"
                             onClick={() => openEdit(entry)}
                           >
-                            Изм.
+                            {t.timeEntries.editShort}
                           </Button>
                           {entry.status === 'draft' && (
                             <Button
@@ -533,7 +537,7 @@ export function TimeEntriesPage() {
                               variant="danger"
                               onClick={() => setDeleteEntry(entry)}
                             >
-                              Удалить
+                              {t.common.delete}
                             </Button>
                           )}
                         </div>
@@ -548,9 +552,9 @@ export function TimeEntriesPage() {
               <tfoot>
                 <tr className="table-total-row">
                   <td colSpan={5} className="total-label">
-                    Итого по странице ({data?.total ?? 0} всего):
+                    {t.timeEntries.pageTotal} ({data?.total ?? 0} {t.timeEntries.total}):
                   </td>
-                  <td className="td-num total-value">{totalHours.toFixed(1)} ч</td>
+                  <td className="td-num total-value">{totalHours.toFixed(1)} {t.timeEntries.hours}</td>
                   <td />
                   <td className="td-num total-value">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
@@ -570,7 +574,7 @@ export function TimeEntriesPage() {
                         {totalConverted.loading
                           ? '…'
                           : totalConverted.amount > 0
-                            ? `${totalConverted.amount.toLocaleString('ru', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SYMBOL[totalCurrency]}`
+                            ? `${totalConverted.amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SYMBOL[totalCurrency]}`
                             : '—'}
                       </span>
                     </div>
@@ -594,12 +598,12 @@ export function TimeEntriesPage() {
       <Modal
         isOpen={!!editEntry}
         onClose={() => setEditEntry(null)}
-        title="Редактировать запись"
+        title={t.timeEntries.editModal}
         size="sm"
       >
         <form onSubmit={handleEdit}>
           <div className="form-group">
-            <label className="form-label">Дата</label>
+            <label className="form-label">{t.timeEntries.dateLabel}</label>
             <input
               type="date"
               className="form-input"
@@ -608,7 +612,7 @@ export function TimeEntriesPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Часы</label>
+            <label className="form-label">{t.timeEntries.hoursLabel}</label>
             <input
               type="number"
               step="0.1"
@@ -621,7 +625,7 @@ export function TimeEntriesPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Описание</label>
+            <label className="form-label">{t.timeEntries.descLabel}</label>
             <input
               className="form-input"
               value={editForm.description ?? ''}
@@ -631,7 +635,7 @@ export function TimeEntriesPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Статус</label>
+            <label className="form-label">{t.timeEntries.statusLabel}</label>
             <select
               className="form-input form-select"
               value={editForm.status ?? ''}
@@ -650,9 +654,9 @@ export function TimeEntriesPage() {
               variant="secondary"
               onClick={() => setEditEntry(null)}
             >
-              Отмена
+              {t.common.cancel}
             </Button>
-            <Button type="submit" loading={editLoading}>Сохранить</Button>
+            <Button type="submit" loading={editLoading}>{t.common.save}</Button>
           </div>
         </form>
       </Modal>
@@ -661,8 +665,8 @@ export function TimeEntriesPage() {
         isOpen={!!deleteEntry}
         onClose={() => setDeleteEntry(null)}
         onConfirm={handleDelete}
-        title="Удалить запись"
-        message="Вы уверены, что хотите удалить эту запись?"
+        title={t.timeEntries.deleteModal}
+        message={t.timeEntries.deleteConfirm}
         loading={deleteLoading}
       />
     </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
 import { useToast } from '@/context/ToastContext'
+import { useLanguage } from '@/i18n/translations'
 import { Table } from '@/components/ui/Table'
 import { Pagination } from '@/components/ui/Pagination'
 import { Button } from '@/components/ui/Button'
@@ -19,12 +20,6 @@ const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
   { value: 'EUR', label: 'EUR €' },
 ]
 
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Активный' },
-  { value: 'paused', label: 'Приостановлен' },
-  { value: 'completed', label: 'Завершён' },
-]
-
 function ProjectForm({
   initial,
   clients,
@@ -39,8 +34,15 @@ function ProjectForm({
   loading: boolean
 }) {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [form, setForm] = useState<ProjectCreate>(initial)
   const nameRef = useRef<HTMLInputElement>(null)
+
+  const STATUS_OPTIONS = [
+    { value: 'active', label: t.status.active },
+    { value: 'paused', label: t.status.paused },
+    { value: 'completed', label: t.status.completed },
+  ]
 
   useEffect(() => {
     nameRef.current?.focus()
@@ -53,11 +55,11 @@ function ProjectForm({
   if (clients.length === 0) {
     return (
       <div style={{ padding: '16px 0' }}>
-        <p style={{ marginBottom: 12 }}>Сначала создайте хотя бы одного клиента.</p>
+        <p style={{ marginBottom: 12 }}>{t.projects.noClientMsg}</p>
         <div className="modal-actions">
-          <Button type="button" variant="secondary" onClick={onCancel}>Отмена</Button>
+          <Button type="button" variant="secondary" onClick={onCancel}>{t.common.cancel}</Button>
           <Button type="button" onClick={() => { onCancel(); navigate('/clients') }}>
-            Перейти к клиентам
+            {t.projects.goToClients}
           </Button>
         </div>
       </div>
@@ -68,33 +70,33 @@ function ProjectForm({
     <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
       <div className="form-grid">
         <Select
-          label="Клиент *"
+          label={t.projects.clientLabel}
           value={form.client_id}
           onChange={e => setForm(prev => ({ ...prev, client_id: Number(e.target.value) }))}
           options={clients.map(c => ({ value: c.id, label: c.name }))}
-          placeholder="Выберите клиента"
+          placeholder={t.projects.selectClient}
           required
         />
-        <Input ref={nameRef} label="Название *" value={form.name} onChange={set('name')} required />
-        <Input label="Ставка/час" type="number" step="0.01" min="0"
+        <Input ref={nameRef} label={t.projects.nameLabel} value={form.name} onChange={set('name')} required />
+        <Input label={t.projects.rateLabel} type="number" step="0.01" min="0"
           value={form.hourly_rate ?? ''} onChange={set('hourly_rate')} />
         <Select
-          label="Валюта"
+          label={t.projects.currencyLabel}
           value={form.currency ?? 'RUB'}
           onChange={e => setForm(prev => ({ ...prev, currency: e.target.value as Currency }))}
           options={CURRENCY_OPTIONS}
         />
         <Select
-          label="Статус"
+          label={t.projects.statusLabel}
           value={form.status ?? 'active'}
           onChange={e => setForm(prev => ({ ...prev, status: e.target.value as ProjectStatus }))}
           options={STATUS_OPTIONS}
         />
       </div>
-      <Textarea label="Описание" value={form.description ?? ''} onChange={set('description')} rows={3} />
+      <Textarea label={t.projects.descLabel} value={form.description ?? ''} onChange={set('description')} rows={3} />
       <div className="modal-actions">
-        <Button type="button" variant="secondary" onClick={onCancel}>Отмена</Button>
-        <Button type="submit" loading={loading}>Сохранить</Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>{t.common.cancel}</Button>
+        <Button type="submit" loading={loading}>{t.common.save}</Button>
       </div>
     </form>
   )
@@ -102,6 +104,7 @@ function ProjectForm({
 
 export function ProjectsPage() {
   const { addToast } = useToast()
+  const { t } = useLanguage()
   const [data, setData] = useState<Page<Project> | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [filterClient, setFilterClient] = useState<string>('')
@@ -113,6 +116,12 @@ export function ProjectsPage() {
   const [deleteProject, setDeleteProject] = useState<Project | null>(null)
   const [formLoading, setFormLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  const STATUS_OPTIONS = [
+    { value: 'active', label: t.status.active },
+    { value: 'paused', label: t.status.paused },
+    { value: 'completed', label: t.status.completed },
+  ]
 
   useEffect(() => {
     clientsService.list({ size: 100 }).then(d => setClients(d.items)).catch(() => {})
@@ -127,9 +136,9 @@ export function ProjectsPage() {
       size: 20,
     })
       .then(setData)
-      .catch(() => addToast('error', 'Ошибка загрузки проектов'))
+      .catch(() => addToast('error', t.common.error))
       .finally(() => setLoading(false))
-  }, [filterClient, filterStatus, page, addToast])
+  }, [filterClient, filterStatus, page, addToast, t])
 
   useEffect(() => { load() }, [load])
 
@@ -139,16 +148,16 @@ export function ProjectsPage() {
       if (editProject) {
         const { client_id: _cid, ...upd } = formData
         await projectsService.update(editProject.id, upd)
-        addToast('success', 'Проект обновлён')
+        addToast('success', t.projects.updatedToast)
       } else {
         await projectsService.create(formData)
-        addToast('success', 'Проект создан')
+        addToast('success', t.projects.createdToast)
       }
       setShowForm(false)
       setEditProject(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Ошибка сохранения')
+      addToast('error', err.message || t.common.error)
     } finally {
       setFormLoading(false)
     }
@@ -159,11 +168,11 @@ export function ProjectsPage() {
     setDeleteLoading(true)
     try {
       await projectsService.delete(deleteProject.id)
-      addToast('success', 'Проект удалён')
+      addToast('success', t.projects.deletedToast)
       setDeleteProject(null)
       load()
     } catch (err: any) {
-      addToast('error', err.message || 'Не удалось удалить проект')
+      addToast('error', err.message || t.common.error)
     } finally {
       setDeleteLoading(false)
     }
@@ -172,15 +181,15 @@ export function ProjectsPage() {
   const clientName = (id: number) => clients.find(c => c.id === id)?.name ?? `#${id}`
 
   const columns: Column<Project>[] = [
-    { key: 'name', label: 'Название' },
-    { key: 'client_id', label: 'Клиент', render: r => clientName(r.client_id) },
-    { key: 'status', label: 'Статус', render: r => <ProjectStatusBadge status={r.status} /> },
-    { key: 'hourly_rate', label: 'Ставка/ч', render: r => r.hourly_rate ? `${r.hourly_rate} ${r.currency ?? 'RUB'}` : '—' },
+    { key: 'name', label: t.projects.nameCol },
+    { key: 'client_id', label: t.projects.clientCol, render: r => clientName(r.client_id) },
+    { key: 'status', label: t.projects.statusCol, render: r => <ProjectStatusBadge status={r.status} /> },
+    { key: 'hourly_rate', label: t.projects.rateCol, render: r => r.hourly_rate ? `${r.hourly_rate} ${r.currency ?? 'RUB'}` : '—' },
     {
       key: 'actions', label: '', render: r => (
         <div className="table-actions">
-          <Button size="sm" variant="ghost" onClick={() => { setEditProject(r); setShowForm(true) }}>Изменить</Button>
-          <Button size="sm" variant="danger" onClick={() => setDeleteProject(r)}>Удалить</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setEditProject(r); setShowForm(true) }}>{t.common.edit}</Button>
+          <Button size="sm" variant="danger" onClick={() => setDeleteProject(r)}>{t.common.delete}</Button>
         </div>
       ),
     },
@@ -197,7 +206,7 @@ export function ProjectsPage() {
             value={filterClient}
             onChange={e => { setFilterClient(e.target.value); setPage(1) }}
           >
-            <option value="">Все клиенты</option>
+            <option value="">{t.common.allClients}</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select
@@ -205,11 +214,11 @@ export function ProjectsPage() {
             value={filterStatus}
             onChange={e => { setFilterStatus(e.target.value); setPage(1) }}
           >
-            <option value="">Все статусы</option>
+            <option value="">{t.common.allStatuses}</option>
             {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
-        <Button onClick={() => { setEditProject(null); setShowForm(true) }}>+ Добавить проект</Button>
+        <Button onClick={() => { setEditProject(null); setShowForm(true) }}>{t.projects.addBtn}</Button>
       </div>
 
       <div className="card">
@@ -218,7 +227,7 @@ export function ProjectsPage() {
           data={data?.items ?? []}
           keyExtractor={r => r.id}
           loading={loading}
-          emptyMessage="Проекты не найдены. Нажмите «+ Добавить проект» чтобы начать."
+          emptyMessage={t.projects.emptyMessage}
         />
         <Pagination page={page} pages={data?.pages ?? 0} total={data?.total ?? 0} onPageChange={setPage} />
       </div>
@@ -226,7 +235,7 @@ export function ProjectsPage() {
       <Modal
         isOpen={showForm}
         onClose={() => { setShowForm(false); setEditProject(null) }}
-        title={editProject ? 'Редактировать проект' : 'Новый проект'}
+        title={editProject ? t.projects.editModal : t.projects.createModal}
         size="md"
       >
         <ProjectForm
@@ -249,8 +258,8 @@ export function ProjectsPage() {
         isOpen={!!deleteProject}
         onClose={() => setDeleteProject(null)}
         onConfirm={handleDelete}
-        title="Удалить проект"
-        message={`Удалить проект «${deleteProject?.name}»? Все записи времени этого проекта будут удалены.`}
+        title={t.projects.deleteTitle}
+        message={`${t.projects.deleteTitle} «${deleteProject?.name}»? ${t.projects.deleteConfirm}`}
         loading={deleteLoading}
       />
     </div>
