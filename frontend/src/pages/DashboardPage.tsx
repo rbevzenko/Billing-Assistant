@@ -35,6 +35,9 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [unbilledCurrency, setUnbilledCurrency] = useState<Currency>('RUB')
   const [unbilledConverted, setUnbilledConverted] = useState<{ amount: number; loading: boolean }>({ amount: 0, loading: false })
+  const [paidCurrency, setPaidCurrency] = useState<Currency>('RUB')
+  const [paidPeriod, setPaidPeriod] = useState<'month' | 'year'>('month')
+  const [paidConverted, setPaidConverted] = useState<{ amount: number; loading: boolean }>({ amount: 0, loading: false })
 
   useEffect(() => {
     dashboardService.get()
@@ -51,6 +54,17 @@ export function DashboardPage() {
       .then(amounts => setUnbilledConverted({ amount: amounts.reduce((s, a) => s + a, 0), loading: false }))
       .catch(() => setUnbilledConverted({ amount: 0, loading: false }))
   }, [data, unbilledCurrency])
+
+  useEffect(() => {
+    if (!data) return
+    const source = paidPeriod === 'month' ? data.paid_this_month_by_currency : data.paid_this_year_by_currency
+    const entries = Object.entries(source ?? {}) as [Currency, number][]
+    if (entries.length === 0) { setPaidConverted({ amount: 0, loading: false }); return }
+    setPaidConverted(prev => ({ ...prev, loading: true }))
+    Promise.all(entries.map(async ([cur, amt]) => amt * await getRate(cur, paidCurrency)))
+      .then(amounts => setPaidConverted({ amount: amounts.reduce((s, a) => s + a, 0), loading: false }))
+      .catch(() => setPaidConverted({ amount: 0, loading: false }))
+  }, [data, paidCurrency, paidPeriod])
 
   if (loading) return <span className="loading-text">Загрузка…</span>
 
@@ -90,6 +104,38 @@ export function DashboardPage() {
                 key={cur}
                 className={`lang-btn ${unbilledCurrency === cur ? 'lang-btn-active' : ''}`}
                 onClick={() => setUnbilledCurrency(cur)}
+                style={{ fontSize: 10, padding: '2px 5px' }}
+              >
+                {cur}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="stat-card stat-card--success">
+          <div className="stat-label">Оплаченные счета</div>
+          <div className="stat-value stat-value--sm">
+            {paidConverted.loading
+              ? '…'
+              : `${fmtMoney(paidConverted.amount)} ${CURRENCY_SYMBOL[paidCurrency]}`}
+          </div>
+          <div className="lang-switcher" style={{ padding: '4px 0 2px' }}>
+            {(['month', 'year'] as const).map(p => (
+              <button
+                key={p}
+                className={`lang-btn ${paidPeriod === p ? 'lang-btn-active' : ''}`}
+                onClick={() => setPaidPeriod(p)}
+                style={{ fontSize: 10, padding: '2px 5px' }}
+              >
+                {p === 'month' ? 'Месяц' : 'Год'}
+              </button>
+            ))}
+          </div>
+          <div className="lang-switcher" style={{ padding: '2px 0 0' }}>
+            {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
+              <button
+                key={cur}
+                className={`lang-btn ${paidCurrency === cur ? 'lang-btn-active' : ''}`}
+                onClick={() => setPaidCurrency(cur)}
                 style={{ fontSize: 10, padding: '2px 5px' }}
               >
                 {cur}

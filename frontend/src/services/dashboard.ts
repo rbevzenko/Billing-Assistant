@@ -77,6 +77,26 @@ export const dashboardService = {
       inv => inv.due_date < today && inv.status !== 'paid'
     ).length
 
+    const yearStart = `${new Date().getFullYear()}-01-01`
+    const yearEnd = `${new Date().getFullYear()}-12-31`
+
+    const paid_this_month_by_currency: Partial<Record<Currency, number>> = {}
+    const paid_this_year_by_currency: Partial<Record<Currency, number>> = {}
+
+    allInvoices
+      .filter(inv => inv.status === 'paid')
+      .forEach(inv => {
+        const cur = (inv.currency ?? 'RUB') as Currency
+        const amt = parseFloat(inv.total_amount)
+        const date = inv.issue_date ?? ''
+        if (date >= month.from && date <= month.to) {
+          paid_this_month_by_currency[cur] = (paid_this_month_by_currency[cur] ?? 0) + amt
+        }
+        if (date >= yearStart && date <= yearEnd) {
+          paid_this_year_by_currency[cur] = (paid_this_year_by_currency[cur] ?? 0) + amt
+        }
+      })
+
     const recent_time_entries: DashboardRecentEntry[] = [...allEntries]
       .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
       .slice(0, 5)
@@ -121,6 +141,8 @@ export const dashboardService = {
       unbilled_by_currency,
       unpaid_amount,
       overdue_invoices_count,
+      paid_this_month_by_currency,
+      paid_this_year_by_currency,
       recent_time_entries,
       recent_invoices,
     }
