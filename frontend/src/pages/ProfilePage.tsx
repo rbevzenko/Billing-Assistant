@@ -71,6 +71,7 @@ function ProfileForm({
   }
 
   const isEu = form.type === 'eu'
+  const isIntlBanking = form.default_currency === 'EUR' || form.default_currency === 'USD'
 
   return (
     <form onSubmit={handleSubmit}>
@@ -122,8 +123,8 @@ function ProfileForm({
       </div>
 
       <div className="form-section">
-        <h3 className="form-section-title">{isEu ? 'Bank Details' : 'Банковские реквизиты'}</h3>
-        {isEu ? (
+        <h3 className="form-section-title">{isIntlBanking ? 'Bank Details' : 'Банковские реквизиты'}</h3>
+        {isIntlBanking ? (
           <div className="form-grid">
             <Input label="IBAN" value={form.iban ?? ''} onChange={set('iban')} placeholder="DE89 3704 0044 0532 0130 00" />
             <Input label="SWIFT / BIC" value={form.swift ?? ''} onChange={set('swift')} placeholder="COBADEFFXXX" />
@@ -235,7 +236,7 @@ export function ProfilePage() {
           )}
           {!profiles.find(p => p.type === 'eu') && (
             <button className={`btn btn-sm ${tab === 'new_eu' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('new_eu')}>
-              + 🌍 Европейский
+              + Новый профиль
             </button>
           )}
         </div>
@@ -251,7 +252,7 @@ export function ProfilePage() {
           <h2 className="card-title">
             {currentProfile
               ? currentProfile.label
-              : newType === 'eu' ? '🌍 Новый европейский профиль' : '🇷🇺 Новый российский профиль'}
+              : newType === 'eu' ? 'Новый профиль' : '🇷🇺 Новый российский профиль'}
           </h2>
           {currentProfile && activeId === currentProfile.id && (
             <span className="badge badge-success" style={{ fontSize: 12 }}>Активный</span>
