@@ -194,6 +194,7 @@ export function InvoicesPage() {
         issue_date: issueDate, due_date: dueDate,
         notes: notes || null,
         currency: createCurrency, vat_type: createVat,
+        payment_currency: createPayCurrency || undefined,
       }
       try {
         const inv = await invoicesService.create(payload)
@@ -348,15 +349,13 @@ export function InvoicesPage() {
                 {VAT_OPTIONS.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
               </select>
             </div>
-            {invoiceType === 'standard' && (
-              <div className="form-group">
-                <label className="form-label">{t.invoices.payCurrencyLabel}</label>
-                <select className="form-input form-select" value={createPayCurrency} onChange={e => setCreatePayCurrency(e.target.value as Currency | '')}>
-                  <option value="">{t.invoices.noConversion}</option>
-                  {CURRENCY_OPTIONS.filter(c => c !== createCurrency).map(c => <option key={c} value={c}>{c} {CURRENCY_SYMBOL[c]}</option>)}
-                </select>
-              </div>
-            )}
+            <div className="form-group">
+              <label className="form-label">{t.invoices.payCurrencyLabel}</label>
+              <select className="form-input form-select" value={createPayCurrency} onChange={e => setCreatePayCurrency(e.target.value as Currency | '')}>
+                <option value="">{t.invoices.noConversion}</option>
+                {CURRENCY_OPTIONS.filter(c => c !== createCurrency).map(c => <option key={c} value={c}>{c} {CURRENCY_SYMBOL[c]}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Advance-specific fields */}
