@@ -15,6 +15,7 @@ export interface Page<T> {
 export type ProjectStatus = 'active' | 'paused' | 'completed'
 export type TimeEntryStatus = 'draft' | 'confirmed' | 'billed'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
+export type InvoiceType = 'standard' | 'advance'
 export type Currency = 'RUB' | 'USD' | 'EUR'
 export type VatType = 'none' | 'exempt' | 'vat0' | 'vat10' | 'vat22'
 export type ProfileType = 'ru' | 'eu'
@@ -126,6 +127,7 @@ export interface InvoiceItem {
   date: string | null
   project_name: string | null
   description: string | null
+  project_id?: number | null
 }
 
 export interface Invoice {
@@ -136,6 +138,7 @@ export interface Invoice {
   issue_date: string
   due_date: string
   status: InvoiceStatus
+  invoice_type: InvoiceType
   notes: string | null
   created_at: string
   items: InvoiceItem[]
@@ -144,6 +147,7 @@ export interface Invoice {
   subtotal: string
   vat_amount: string
   total_amount: string
+  project_id?: number | null
   payment_currency?: Currency
   exchange_rate?: number
   payment_amount?: string
@@ -152,13 +156,22 @@ export interface Invoice {
 export interface InvoiceCreate {
   client_id: number
   profile_id: number
-  time_entry_ids: number[]
+  time_entry_ids?: number[]
   issue_date: string
   due_date: string
   notes?: string | null
   currency?: Currency
   vat_type?: VatType
   payment_currency?: Currency
+  invoice_type?: InvoiceType
+  project_id?: number | null
+  advance_amount?: string
+}
+
+export interface ProjectAdvanceBalance {
+  paid: number
+  billed: number
+  balance: number
 }
 
 export interface InvoiceUpdate {

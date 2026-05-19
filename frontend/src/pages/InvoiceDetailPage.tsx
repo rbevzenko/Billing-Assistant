@@ -91,7 +91,7 @@ export function InvoiceDetailPage() {
   const totalHours = invoice.items.reduce((s, i) => s + Number(i.hours), 0)
   const showVat = invoice.vat_type === 'vat10' || invoice.vat_type === 'vat22'
   const vatLabel = T.vat[invoice.vat_type]
-
+  const isAdvance = invoice.invoice_type === 'advance'
   const isEu = profile?.type === 'eu'
 
   return (
@@ -114,7 +114,10 @@ export function InvoiceDetailPage() {
         <div className="invoice-doc-header">
           <div>
             <h1 className="invoice-doc-title">{T.invoice.invoice} {invoice.invoice_number}</h1>
-            <div style={{ marginTop: 6 }}><InvoiceStatusBadge status={invoice.status} /></div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {isAdvance && <span className="badge badge-advance">{lang === 'ru' ? 'Аванс' : 'Advance'}</span>}
+              <InvoiceStatusBadge status={invoice.status} />
+            </div>
           </div>
           <div className="invoice-doc-dates">
             <div className="invoice-meta-item">
@@ -195,44 +198,65 @@ export function InvoiceDetailPage() {
         )}
 
         <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{T.invoice.date}</th>
-                <th>{T.invoice.project}</th>
-                <th>{T.invoice.description}</th>
-                <th>{T.invoice.hours}</th>
-                <th>{T.invoice.rate}, {sym}/h</th>
-                <th>{T.invoice.amount}, {sym}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.items.map((item, idx) => (
-                <tr key={item.id}>
-                  <td>{item.date ? fmtDate(item.date, lang) : `${idx + 1}`}</td>
-                  <td>{item.project_name ?? '—'}</td>
-                  <td className="td-desc">{item.description ?? '—'}</td>
-                  <td className="td-num">{Number(item.hours).toFixed(1)}</td>
-                  <td className="td-num">{Number(item.rate).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="td-num">{Number(item.amount).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2 })}</td>
+          {isAdvance ? (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{T.invoice.description}</th>
+                  <th>{T.invoice.project}</th>
+                  <th>{T.invoice.amount}, {sym}</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="table-total-row">
-                <td colSpan={3} className="total-label">{t.invoiceDetail.subtotalLabel}</td>
-                <td className="td-num total-value">{totalHours.toFixed(1)} h</td>
-                <td />
-                <td className="td-num total-value">{fmt(invoice.subtotal ?? invoice.total_amount)}</td>
-              </tr>
-              {showVat && (
+              </thead>
+              <tbody>
+                {invoice.items.map(item => (
+                  <tr key={item.id}>
+                    <td>{item.description ?? (lang === 'ru' ? 'Авансовый платёж' : 'Advance Payment')}</td>
+                    <td>{item.project_name ?? '—'}</td>
+                    <td className="td-num">{Number(item.amount).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{T.invoice.date}</th>
+                  <th>{T.invoice.project}</th>
+                  <th>{T.invoice.description}</th>
+                  <th>{T.invoice.hours}</th>
+                  <th>{T.invoice.rate}, {sym}/h</th>
+                  <th>{T.invoice.amount}, {sym}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.items.map((item, idx) => (
+                  <tr key={item.id}>
+                    <td>{item.date ? fmtDate(item.date, lang) : `${idx + 1}`}</td>
+                    <td>{item.project_name ?? '—'}</td>
+                    <td className="td-desc">{item.description ?? '—'}</td>
+                    <td className="td-num">{Number(item.hours).toFixed(1)}</td>
+                    <td className="td-num">{Number(item.rate).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2 })}</td>
+                    <td className="td-num">{Number(item.amount).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
                 <tr className="table-total-row">
-                  <td colSpan={5} className="total-label">{vatLabel}:</td>
-                  <td className="td-num total-value">{fmt(invoice.vat_amount ?? '0')}</td>
+                  <td colSpan={3} className="total-label">{t.invoiceDetail.subtotalLabel}</td>
+                  <td className="td-num total-value">{totalHours.toFixed(1)} h</td>
+                  <td />
+                  <td className="td-num total-value">{fmt(invoice.subtotal ?? invoice.total_amount)}</td>
                 </tr>
-              )}
-            </tfoot>
-          </table>
+                {showVat && (
+                  <tr className="table-total-row">
+                    <td colSpan={5} className="total-label">{vatLabel}:</td>
+                    <td className="td-num total-value">{fmt(invoice.vat_amount ?? '0')}</td>
+                  </tr>
+                )}
+              </tfoot>
+            </table>
+          )}
         </div>
 
         <div className="invoice-doc-footer">
