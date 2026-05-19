@@ -131,6 +131,16 @@ export const invoicesService = {
       const { data: projectRow } = await supabase
         .from('projects').select('name').eq('id', data.project_id).single()
 
+      const advancePayCurrency: Currency | undefined = data.payment_currency
+      let adv_exchange_rate: number | undefined
+      let adv_payment_amount: string | undefined
+      if (advancePayCurrency && advancePayCurrency !== currency) {
+        try {
+          adv_exchange_rate = await getRate(currency, advancePayCurrency)
+          adv_payment_amount = (advanceAmt * adv_exchange_rate).toFixed(2)
+        } catch { /* continue without conversion */ }
+      }
+
       const invoicePayload = {
         client_id: data.client_id,
         profile_id: data.profile_id,
@@ -146,6 +156,9 @@ export const invoicesService = {
         total_amount: advanceAmt.toFixed(2),
         invoice_type: 'advance',
         project_id: data.project_id ?? null,
+        ...(advancePayCurrency && adv_exchange_rate !== undefined
+          ? { payment_currency: advancePayCurrency, exchange_rate: adv_exchange_rate, payment_amount: adv_payment_amount }
+          : {}),
       }
 
       const { data: createdInvoice, error: invError } = await supabase
@@ -454,7 +467,7 @@ export const invoicesService = {
     <div class="vat-block">${vatLabel}: ${fmt(invoice.vat_amount)}</div>
   ` : ''}
   <div class="total">${T.invoice.total}: ${fmt(invoice.total_amount)}</div>
-  ${!isAdvance && invoice.payment_currency && invoice.payment_amount && invoice.exchange_rate ? `
+  ${invoice.payment_currency && invoice.payment_amount && invoice.exchange_rate ? `
     <div class="payment-block">
       ${T.invoice.paymentTotal} ${invoice.payment_currency}:
       ${fmtN(parseFloat(invoice.payment_amount))} ${CURRENCY_SYMBOL[invoice.payment_currency]}
