@@ -614,6 +614,7 @@ input, select, textarea { font-family: inherit; }
 .badge-info    { background: #dbeafe; color: #1e40af; }
 .badge-neutral { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
 .badge-purple  { background: #ede9fe; color: #5b21b6; }
+.badge-advance { background: #cffafe; color: #0e7490; }
 
 /* ── Invoice detail ───────────────────────────────────────────────────────── */
 .invoice-meta {

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
+import { invoicesService } from '@/services/invoices'
 import { useToast } from '@/context/ToastContext'
 import { useLanguage } from '@/i18n/translations'
+import { CURRENCY_SYMBOL } from '@/services/exchange'
 import { Table } from '@/components/ui/Table'
 import { Pagination } from '@/components/ui/Pagination'
 import { Button } from '@/components/ui/Button'
@@ -12,7 +14,7 @@ import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { ProjectStatusBadge } from '@/components/ui/Badge'
-import type { Client, Column, Currency, Page, Project, ProjectCreate, ProjectStatus } from '@/types'
+import type { Client, Column, Currency, Page, Project, ProjectAdvanceBalance, ProjectCreate, ProjectStatus } from '@/types'
 
 const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
   { value: 'RUB', label: 'RUB ₽' },
@@ -104,7 +106,7 @@ function ProjectForm({
 
 export function ProjectsPage() {
   const { addToast } = useToast()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [data, setData] = useState<Page<Project> | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [filterClient, setFilterClient] = useState<string>('')
@@ -116,6 +118,7 @@ export function ProjectsPage() {
   const [deleteProject, setDeleteProject] = useState<Project | null>(null)
   const [formLoading, setFormLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [advanceBalances, setAdvanceBalances] = useState<Record<number, ProjectAdvanceBalance>>({})
 
   const STATUS_OPTIONS = [
     { value: 'active', label: t.status.active },
@@ -135,7 +138,13 @@ export function ProjectsPage() {
       page,
       size: 20,
     })
-      .then(setData)
+      .then(d => {
+        setData(d)
+        const ids = d.items.map(p => p.id)
+        invoicesService.getProjectAdvanceBalances(ids)
+          .then(setAdvanceBalances)
+          .catch(() => {})
+      })
       .catch(() => addToast('error', t.common.error))
       .finally(() => setLoading(false))
   }, [filterClient, filterStatus, page, addToast, t])
@@ -179,12 +188,32 @@ export function ProjectsPage() {
   }
 
   const clientName = (id: number) => clients.find(c => c.id === id)?.name ?? `#${id}`
+  const locale = lang === 'en' ? 'en-US' : 'ru-RU'
+  const fmtAdv = (n: number, cur: Currency) =>
+    `${n.toLocaleString(locale, { maximumFractionDigits: 0 })} ${CURRENCY_SYMBOL[cur]}`
 
   const columns: Column<Project>[] = [
     { key: 'name', label: t.projects.nameCol },
     { key: 'client_id', label: t.projects.clientCol, render: r => clientName(r.client_id) },
     { key: 'status', label: t.projects.statusCol, render: r => <ProjectStatusBadge status={r.status} /> },
     { key: 'hourly_rate', label: t.projects.rateCol, render: r => r.hourly_rate ? `${r.hourly_rate} ${r.currency ?? 'RUB'}` : '—' },
+    {
+      key: 'advance', label: t.projects.advanceCol, render: r => {
+        const adv = advanceBalances[r.id]
+        if (!adv) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+        const cur = (r.currency ?? 'RUB') as Currency
+        if (adv.balance <= 0) {
+          return <span className="badge badge-neutral">{t.projects.advanceUsed}</span>
+        }
+        return (
+          <span style={{ fontSize: 12 }}>
+            <span style={{ color: 'var(--text-secondary)' }}>{t.projects.advancePaid}: {fmtAdv(adv.paid, cur)}</span>
+            <br />
+            <span className="badge badge-advance" style={{ marginTop: 2 }}>{t.projects.advanceBalance}: {fmtAdv(adv.balance, cur)}</span>
+          </span>
+        )
+      },
+    },
     {
       key: 'actions', label: '', render: r => (
         <div className="table-actions">

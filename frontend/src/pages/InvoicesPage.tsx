@@ -14,7 +14,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InvoiceStatusBadge } from '@/components/ui/Badge'
 import { CURRENCY_SYMBOL } from '@/services/exchange'
 import type {
-  Client, Currency, Invoice, InvoiceCreate, InvoiceStatus,
+  Client, Currency, Invoice, InvoiceCreate, InvoiceStatus, InvoiceType,
   LawyerProfile, Page, Project, TimeEntry, VatType,
 } from '@/types'
 
@@ -44,6 +44,7 @@ export function InvoicesPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
 
   const [showCreate, setShowCreate] = useState(false)
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>('standard')
   const [createClient, setCreateClient] = useState('')
   const [createProfile, setCreateProfile] = useState('')
   const [createCurrency, setCreateCurrency] = useState<Currency>('RUB')
@@ -52,6 +53,8 @@ export function InvoicesPage() {
   const [confirmedEntries, setConfirmedEntries] = useState<TimeEntry[]>([])
   const [clientProjects, setClientProjects] = useState<Project[]>([])
   const [selectedEntries, setSelectedEntries] = useState<Set<number>>(new Set())
+  const [advanceProject, setAdvanceProject] = useState('')
+  const [advanceAmount, setAdvanceAmount] = useState('')
   const [issueDate, setIssueDate] = useState(today())
   const [dueDate, setDueDate] = useState(futureDate(14))
   const [notes, setNotes] = useState('')
@@ -170,12 +173,39 @@ export function InvoicesPage() {
   const resetCreateForm = () => {
     setCreateClient(''); setConfirmedEntries([]); setClientProjects([]); setSelectedEntries(new Set())
     setIssueDate(today()); setDueDate(futureDate(14)); setNotes(''); setCreatePayCurrency('')
+    setInvoiceType('standard'); setAdvanceProject(''); setAdvanceAmount('')
   }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!createClient || selectedEntries.size === 0) { addToast('error', t.invoices.selectClientEntry); return }
     if (!createProfile) { addToast('error', t.invoices.selectProfileRequired); return }
+
+    if (invoiceType === 'advance') {
+      if (!createClient || !advanceProject || !advanceAmount) {
+        addToast('error', t.invoices.selectClientEntry); return
+      }
+      setCreateLoading(true)
+      const payload: InvoiceCreate = {
+        invoice_type: 'advance',
+        client_id: Number(createClient),
+        profile_id: Number(createProfile),
+        project_id: Number(advanceProject),
+        advance_amount: advanceAmount,
+        issue_date: issueDate, due_date: dueDate,
+        notes: notes || null,
+        currency: createCurrency, vat_type: createVat,
+      }
+      try {
+        const inv = await invoicesService.create(payload)
+        addToast('success', `${inv.invoice_number} ${t.invoices.createdToast}`)
+        setShowCreate(false); resetCreateForm(); load()
+      } catch (err: any) {
+        addToast('error', err.message || t.common.error)
+      } finally { setCreateLoading(false) }
+      return
+    }
+
+    if (!createClient || selectedEntries.size === 0) { addToast('error', t.invoices.selectClientEntry); return }
     setCreateLoading(true)
     const payload: InvoiceCreate = {
       client_id: Number(createClient),
@@ -240,7 +270,12 @@ export function InvoicesPage() {
                     {isOverdue(inv) && <span className="overdue-tag">{t.invoices.overdueBadge}</span>}
                   </td>
                   <td className="td-num">{fmtAmount(inv)}</td>
-                  <td><InvoiceStatusBadge status={inv.status} /></td>
+                  <td>
+                    {inv.invoice_type === 'advance' && (
+                      <span className="badge badge-advance" style={{ marginRight: 4 }}>{t.invoices.advanceBadge}</span>
+                    )}
+                    <InvoiceStatusBadge status={inv.status} />
+                  </td>
                   <td>
                     <div className="table-actions">
                       <Button size="sm" variant="ghost" onClick={() => navigate(`/invoices/${inv.id}`)}>{t.invoices.openBtn}</Button>
@@ -266,12 +301,29 @@ export function InvoicesPage() {
 
       <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); resetCreateForm() }} title={t.invoices.createModal} size="lg">
         <form onSubmit={handleCreate}>
+          {/* Invoice type toggle */}
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">{t.invoices.invoiceType}</label>
+            <div className="lang-switcher" style={{ padding: 0 }}>
+              <button type="button"
+                className={`lang-btn ${invoiceType === 'standard' ? 'lang-btn-active' : ''}`}
+                onClick={() => setInvoiceType('standard')} style={{ fontSize: 13, padding: '4px 12px' }}>
+                {t.invoices.standard}
+              </button>
+              <button type="button"
+                className={`lang-btn ${invoiceType === 'advance' ? 'lang-btn-active' : ''}`}
+                onClick={() => setInvoiceType('advance')} style={{ fontSize: 13, padding: '4px 12px' }}>
+                {t.invoices.advanceLabel}
+              </button>
+            </div>
+          </div>
+
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">{t.invoices.profileLabel}</label>
               <select className="form-input form-select" value={createProfile} onChange={e => setCreateProfile(e.target.value)} required>
                 <option value="">{t.invoices.selectProfile}</option>
-                {profiles.map(p => <option key={p.id} value={p.id}>{p.type === 'eu' ? '🌍' : '🇷🇺'} {p.label}</option>)}
+                {profiles.map(p => <option key={p.id} value={p.id}>{(p.default_currency === 'EUR' || p.default_currency === 'USD') ? 'EU' : '🇷🇺'} {p.label}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -296,16 +348,52 @@ export function InvoicesPage() {
                 {VAT_OPTIONS.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
               </select>
             </div>
-            <div className="form-group">
-              <label className="form-label">{t.invoices.payCurrencyLabel}</label>
-              <select className="form-input form-select" value={createPayCurrency} onChange={e => setCreatePayCurrency(e.target.value as Currency | '')}>
-                <option value="">{t.invoices.noConversion}</option>
-                {CURRENCY_OPTIONS.filter(c => c !== createCurrency).map(c => <option key={c} value={c}>{c} {CURRENCY_SYMBOL[c]}</option>)}
-              </select>
-            </div>
+            {invoiceType === 'standard' && (
+              <div className="form-group">
+                <label className="form-label">{t.invoices.payCurrencyLabel}</label>
+                <select className="form-input form-select" value={createPayCurrency} onChange={e => setCreatePayCurrency(e.target.value as Currency | '')}>
+                  <option value="">{t.invoices.noConversion}</option>
+                  {CURRENCY_OPTIONS.filter(c => c !== createCurrency).map(c => <option key={c} value={c}>{c} {CURRENCY_SYMBOL[c]}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
-          {createClient && (
+          {/* Advance-specific fields */}
+          {invoiceType === 'advance' && (
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">{t.invoices.advanceProjectLabel}</label>
+                {!createClient ? (
+                  <p className="create-no-entries">{t.invoices.advanceSelectClient}</p>
+                ) : entriesLoading ? (
+                  <p className="loading-text" style={{ padding: '8px 0' }}>{t.common.loading}</p>
+                ) : clientProjects.length === 0 ? (
+                  <p className="create-no-entries">{t.invoices.noProjectsForClient}</p>
+                ) : (
+                  <select className="form-input form-select" value={advanceProject}
+                    onChange={e => setAdvanceProject(e.target.value)} required>
+                    <option value="">{t.invoices.selectProject}</option>
+                    {clientProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">{t.invoices.advanceAmountLabel}</label>
+                <input
+                  type="number" min="0.01" step="0.01"
+                  className="form-input"
+                  value={advanceAmount}
+                  onChange={e => setAdvanceAmount(e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Standard: time entries */}
+          {invoiceType === 'standard' && createClient && (
             <div className="form-group">
               <div className="create-entries-header">
                 <label className="form-label" style={{ margin: 0 }}>{t.invoices.confirmedEntriesLabel}</label>
@@ -342,7 +430,7 @@ export function InvoicesPage() {
             </div>
           )}
 
-          {previewRows.length > 0 && (
+          {invoiceType === 'standard' && previewRows.length > 0 && (
             <div className="form-group">
               <label className="form-label">{t.invoices.previewLabel}</label>
               <div className="invoice-preview">
@@ -401,8 +489,10 @@ export function InvoicesPage() {
 
           <div className="modal-actions">
             <Button type="button" variant="secondary" onClick={() => { setShowCreate(false); resetCreateForm() }}>{t.common.cancel}</Button>
-            <Button type="submit" loading={createLoading} disabled={selectedEntries.size === 0}>
-              {t.invoices.createInvoiceBtn}{selectedEntries.size > 0 && ` (${selectedEntries.size})`}
+            <Button type="submit" loading={createLoading}
+              disabled={invoiceType === 'standard' ? selectedEntries.size === 0 : !advanceProject || !advanceAmount}>
+              {t.invoices.createInvoiceBtn}
+              {invoiceType === 'standard' && selectedEntries.size > 0 && ` (${selectedEntries.size})`}
             </Button>
           </div>
         </form>

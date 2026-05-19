@@ -130,3 +130,11 @@ CREATE POLICY "auth_all" ON invoice_items   FOR ALL USING (auth.uid() IS NOT NUL
 --   Authentication → Users → Invite user (or Add user)
 -- No SQL needed — Supabase Auth handles user creation.
 -- ============================================================
+
+-- ============================================================
+-- Migration: Advance Payment (Авансовый платёж)
+-- Run in Supabase SQL Editor → New query:
+-- ============================================================
+-- ALTER TABLE invoices ADD COLUMN IF NOT EXISTS invoice_type TEXT NOT NULL DEFAULT 'standard';
+-- ALTER TABLE invoices ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+-- ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
