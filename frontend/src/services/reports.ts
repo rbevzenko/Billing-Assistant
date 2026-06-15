@@ -39,17 +39,18 @@ export const reportsService = {
       invoices = invoices.filter(inv => inv.client_id === params.client_id)
     }
 
-    const clientMap = new Map<number, Map<number, { hours: number; amount: number; count: number }>>()
+    const clientMap = new Map<number, Map<number, { hours: number; amount: number; count: number; currency: string }>>()
     for (const e of entries) {
       const project = allProjects.find(p => p.id === e.project_id)
       if (!project) continue
       const rate = parseFloat(project.hourly_rate ?? profile?.default_hourly_rate ?? '0')
       const hours = parseFloat(e.duration_hours)
       const amount = hours * rate
+      const currency = project.currency ?? 'RUB'
       if (!clientMap.has(project.client_id)) clientMap.set(project.client_id, new Map())
       const projMap = clientMap.get(project.client_id)!
-      const existing = projMap.get(project.id) ?? { hours: 0, amount: 0, count: 0 }
-      projMap.set(project.id, { hours: existing.hours + hours, amount: existing.amount + amount, count: existing.count + 1 })
+      const existing = projMap.get(project.id) ?? { hours: 0, amount: 0, count: 0, currency }
+      projMap.set(project.id, { hours: existing.hours + hours, amount: existing.amount + amount, count: existing.count + 1, currency })
     }
 
     const breakdown: ClientBreakdown[] = []
@@ -58,6 +59,7 @@ export const reportsService = {
       const projectBreakdowns: ProjectBreakdown[] = []
       let clientHours = 0
       let clientAmount = 0
+      const amounts_by_currency: Record<string, number> = {}
       for (const [projectId, stats] of projMap.entries()) {
         const project = allProjects.find(p => p.id === projectId)
         projectBreakdowns.push({
@@ -66,21 +68,30 @@ export const reportsService = {
           entries_count: stats.count,
           hours: stats.hours,
           amount: stats.amount,
+          currency: stats.currency,
         })
         clientHours += stats.hours
         clientAmount += stats.amount
+        amounts_by_currency[stats.currency] = (amounts_by_currency[stats.currency] ?? 0) + stats.amount
       }
       breakdown.push({
         client_id: clientId,
         client_name: client?.name ?? '—',
         hours: clientHours,
         amount: clientAmount,
+        amounts_by_currency,
         projects: projectBreakdowns,
       })
     }
 
     const total_hours = breakdown.reduce((s, c) => s + c.hours, 0)
     const total_amount = breakdown.reduce((s, c) => s + c.amount, 0)
+    const total_amounts: Record<string, number> = {}
+    for (const c of breakdown) {
+      for (const [cur, amt] of Object.entries(c.amounts_by_currency)) {
+        total_amounts[cur] = (total_amounts[cur] ?? 0) + amt
+      }
+    }
 
     const invoice_summary: InvoiceSummary = {
       count_total: invoices.length,
@@ -98,6 +109,7 @@ export const reportsService = {
       client_id: params.client_id ?? null,
       total_hours,
       total_amount,
+      total_amounts,
       breakdown,
       invoice_summary,
     }

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { reportsService } from '@/services/reports'
 import { clientsService } from '@/services/clients'
 import { useLanguage } from '@/i18n/translations'
-import type { Client, ReportData } from '@/types'
+import { CURRENCY_SYMBOL } from '@/services/exchange'
+import type { Client, Currency, ReportData } from '@/types'
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 
@@ -73,6 +74,13 @@ export function ReportsPage() {
 
   function fmtMoney(n: number): string {
     return n.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  }
+
+  function fmtAmounts(amounts: Record<string, number>): string {
+    return Object.entries(amounts)
+      .filter(([, v]) => v > 0)
+      .map(([cur, v]) => `${fmtMoney(v)} ${CURRENCY_SYMBOL[cur as Currency] ?? cur}`)
+      .join(' / ')
   }
 
   const [clients, setClients] = useState<Client[]>([])
@@ -205,7 +213,7 @@ export function ReportsPage() {
             </div>
             <div className="stat-card stat-card--warning">
               <div className="stat-label">{t.reports.billingAmount}</div>
-              <div className="stat-value stat-value--sm">{fmtMoney(report.total_amount)} ₽</div>
+              <div className="stat-value stat-value--sm">{fmtAmounts(report.total_amounts)}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">{t.reports.invoicesIssued}</div>
@@ -213,7 +221,7 @@ export function ReportsPage() {
             </div>
             <div className="stat-card">
               <div className="stat-label">{t.reports.paid}</div>
-              <div className="stat-value stat-value--sm">{fmtMoney(report.invoice_summary.total_paid)} ₽</div>
+              <div className="stat-value stat-value--sm">{fmtMoney(report.invoice_summary.total_paid)}</div>
             </div>
           </div>
 
@@ -254,7 +262,7 @@ export function ReportsPage() {
                           {client.projects.reduce((s, p) => s + p.entries_count, 0)}
                         </td>
                         <td className="td-num report-client-num">{fmtHours(client.hours)}</td>
-                        <td className="td-num report-client-num">{fmtMoney(client.amount)}</td>
+                        <td className="td-num report-client-num">{fmtAmounts(client.amounts_by_currency)}</td>
                       </tr>
                       {expanded.has(client.client_id) &&
                         client.projects.map(proj => (
@@ -264,7 +272,7 @@ export function ReportsPage() {
                               {proj.entries_count}
                             </td>
                             <td className="td-num">{fmtHours(proj.hours)}</td>
-                            <td className="td-num">{fmtMoney(proj.amount)}</td>
+                            <td className="td-num">{fmtMoney(proj.amount)} {CURRENCY_SYMBOL[proj.currency as Currency] ?? proj.currency}</td>
                           </tr>
                         ))
                       }
@@ -276,7 +284,7 @@ export function ReportsPage() {
                     <td><strong>{t.reports.breakdownTotal}</strong></td>
                     <td></td>
                     <td className="td-num"><strong>{fmtHours(report.total_hours)} {hoursUnit}</strong></td>
-                    <td className="td-num"><strong>{fmtMoney(report.total_amount)} ₽</strong></td>
+                    <td className="td-num"><strong>{fmtAmounts(report.total_amounts)}</strong></td>
                   </tr>
                 </tfoot>
               </table>

@@ -264,6 +264,7 @@ export interface ProjectBreakdown {
   entries_count: number
   hours: number
   amount: number
+  currency: string
 }
 
 export interface ClientBreakdown {
@@ -271,6 +272,7 @@ export interface ClientBreakdown {
   client_name: string
   hours: number
   amount: number
+  amounts_by_currency: Record<string, number>
   projects: ProjectBreakdown[]
 }
 
@@ -290,6 +292,7 @@ export interface ReportData {
   client_id: number | null
   total_hours: number
   total_amount: number
+  total_amounts: Record<string, number>
   breakdown: ClientBreakdown[]
   invoice_summary: InvoiceSummary
 }
