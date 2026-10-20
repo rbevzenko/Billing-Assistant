@@ -23,8 +23,7 @@ function calcVat(subtotal: number, vatType: VatType): number {
   return vatType === 'vat10' || vatType === 'vat22' ? subtotal * rate : 0
 }
 
-function printHtml(html: string) {
-  const win = window.open('', '_blank')
+function printInWindow(win: Window | null, html: string) {
   if (win) {
     win.document.write(html)
     win.document.close()
@@ -334,6 +333,8 @@ export const invoicesService = {
   },
 
   downloadPdf: async (id: number, _invoiceNumber: string): Promise<void> => {
+    // Open window synchronously before any await — iOS Safari blocks window.open() in async context
+    const win = window.open('', '_blank')
     const invoice = await invoicesService.get(id)
     if (!invoice) return
 
@@ -485,6 +486,6 @@ export const invoicesService = {
   </div>` : ''}
 </body></html>`
 
-    printHtml(html)
+    printInWindow(win, html)
   },
 }
