@@ -116,6 +116,8 @@ export const reportsService = {
   },
 
   downloadPdf: async (params: ReportParams): Promise<void> => {
+    // Open window synchronously before any await — iOS Safari blocks window.open() in async context
+    const win = window.open('', '_blank')
     const data = await reportsService.get(params)
 
     const [
@@ -244,7 +246,6 @@ export const reportsService = {
   </div>` : ''}
 </body></html>`
 
-    const win = window.open('', '_blank')
     if (win) {
       win.document.write(html)
       win.document.close()
