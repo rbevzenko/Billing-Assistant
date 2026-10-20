@@ -146,6 +146,14 @@ export const reportsService = {
     const fmtAmt = (n: number, cur = '₽') =>
       n.toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + '\u00a0' + cur
 
+    const CUR_SYM: Record<string, string> = { RUB: '₽', USD: '$', EUR: '€' }
+    const fmtAmtsByCur = (amounts: Record<string, number>) =>
+      Object.entries(amounts)
+        .filter(([, v]) => v > 0)
+        .map(([cc, v]) => fmtAmt(v, CUR_SYM[cc] ?? cc))
+        .join(' / ') || '—'
+
+
     const clientRowsHtml = data.breakdown.map(c => {
       const projRowsHtml = c.projects.map(proj => {
         const project = allProjects.find(p => p.id === proj.project_id)
@@ -183,7 +191,7 @@ export const reportsService = {
       <tr class="client-total">
         <td colspan="2" class="td-right">Итого по клиенту:</td>
         <td class="td-num">${c.hours.toFixed(2)}\u00a0ч</td>
-        <td class="td-num">${fmtAmt(c.amount)}</td>
+        <td class="td-num">${fmtAmtsByCur(c.amounts_by_currency)}</td>
       </tr>`
     }).join('')
 
@@ -227,7 +235,7 @@ export const reportsService = {
   ${sigName ? `<div class="lawyer">${sigName}</div>` : ''}
   <div class="summary">
     <div class="box"><div class="box-label">Всего часов</div><div class="box-value">${data.total_hours.toFixed(2)}</div></div>
-    <div class="box"><div class="box-label">Сумма (руб.)</div><div class="box-value">${fmtAmt(data.total_amount)}</div></div>
+    <div class="box"><div class="box-label">Сумма</div><div class="box-value">${fmtAmtsByCur(data.total_amounts)}</div></div>
     <div class="box"><div class="box-label">Счетов выставлено</div><div class="box-value">${data.invoice_summary.count_total}</div></div>
   </div>
   <table>
@@ -237,7 +245,7 @@ export const reportsService = {
     </tr></thead>
     <tbody>${clientRowsHtml}</tbody>
   </table>
-  <div class="grand-total">Итого: ${data.total_hours.toFixed(2)}&nbsp;ч &nbsp;|&nbsp; ${fmtAmt(data.total_amount)}</div>
+  <div class="grand-total">Итого: ${data.total_hours.toFixed(2)}&nbsp;ч &nbsp;|&nbsp; ${fmtAmtsByCur(data.total_amounts)}</div>
   ${sigName ? `<div class="sig-block">
     <div class="sig-line">
       <div class="sig-underline"></div>
