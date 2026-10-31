@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { timeEntriesService } from '@/services/timeEntries'
 import { projectsService } from '@/services/projects'
 import { clientsService } from '@/services/clients'
@@ -39,12 +40,14 @@ export function TimeEntriesPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
 
-  // Filters
+  const [searchParams] = useSearchParams()
+
+  // Filters — initialised from URL query params when navigated from dashboard
   const [filterClient, setFilterClient] = useState('')
   const [filterProject, setFilterProject] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterDateFrom, setFilterDateFrom] = useState('')
-  const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') ?? '')
+  const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get('date_from') ?? '')
+  const [filterDateTo, setFilterDateTo] = useState(() => searchParams.get('date_to') ?? '')
 
   // Quick entry form
   const [qProject, setQProject] = useState(() =>

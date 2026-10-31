@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { dashboardService } from '@/services/dashboard'
 import { getRate, CURRENCY_SYMBOL } from '@/services/exchange'
 import { useLanguage } from '@/i18n/translations'
 import type { Currency, DashboardData, InvoiceStatus, TimeEntryStatus } from '@/types'
 
+function isoToday() { return new Date().toISOString().slice(0, 10) }
+function isoWeekStart() {
+  const d = new Date(); const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+  d.setDate(d.getDate() - day); return d.toISOString().slice(0, 10)
+}
+function isoMonthStart() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+function isoYearStart() { return `${new Date().getFullYear()}-01-01` }
+function isoYearEnd()   { return `${new Date().getFullYear()}-12-31` }
+
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { lang, t } = useLanguage()
   const locale = lang === 'en' ? 'en-US' : 'ru-RU'
   const fmt = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 1 })
@@ -77,22 +90,26 @@ export function DashboardPage() {
     <div>
       {/* ── Metric cards ─────────────────────────────────────────────────── */}
       <div className="dashboard-grid">
-        <div className="stat-card">
+        <div className="stat-card stat-card--clickable"
+          onClick={() => navigate(`/time-entries?date_from=${isoWeekStart()}&date_to=${isoToday()}`)}>
           <div className="stat-label">{t.dashboard.hoursWeek}</div>
           <div className="stat-value">{fmt(data.hours_this_week)}</div>
           <div className="stat-sub">{t.dashboard.sinceMonday}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card--clickable"
+          onClick={() => navigate(`/time-entries?date_from=${isoMonthStart()}&date_to=${isoToday()}`)}>
           <div className="stat-label">{t.dashboard.hoursMonth}</div>
           <div className="stat-value">{fmt(data.hours_this_month)}</div>
           <div className="stat-sub">{t.dashboard.currentMonth}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card--clickable"
+          onClick={() => navigate(`/time-entries?date_from=${isoYearStart()}&date_to=${isoYearEnd()}`)}>
           <div className="stat-label">{t.dashboard.hoursYear}</div>
           <div className="stat-value">{fmt(data.hours_this_year)}</div>
           <div className="stat-sub">{t.dashboard.currentYear}</div>
         </div>
-        <div className="stat-card stat-card--warning">
+        <div className="stat-card stat-card--warning stat-card--clickable"
+          onClick={() => navigate('/time-entries?status=confirmed')}>
           <div className="stat-label">{t.dashboard.unbilled}</div>
           <div className="stat-value stat-value--sm">
             {unbilledConverted.loading
@@ -100,7 +117,7 @@ export function DashboardPage() {
               : `${fmtMoney(unbilledConverted.amount)} ${CURRENCY_SYMBOL[unbilledCurrency]}`}
           </div>
           <div className="stat-sub">{t.dashboard.confirmedLabel}</div>
-          <div className="lang-switcher" style={{ padding: '4px 0 0' }}>
+          <div className="lang-switcher" style={{ padding: '4px 0 0' }} onClick={e => e.stopPropagation()}>
             {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
               <button
                 key={cur}
@@ -113,14 +130,19 @@ export function DashboardPage() {
             ))}
           </div>
         </div>
-        <div className="stat-card stat-card--success">
+        <div className="stat-card stat-card--success stat-card--clickable"
+          onClick={() => navigate(
+            paidPeriod === 'month'
+              ? `/invoices?status=paid&date_from=${isoMonthStart()}&date_to=${isoToday()}`
+              : `/invoices?status=paid&date_from=${isoYearStart()}&date_to=${isoYearEnd()}`
+          )}>
           <div className="stat-label">{t.dashboard.paidInvoices}</div>
           <div className="stat-value stat-value--sm">
             {paidConverted.loading
               ? '…'
               : `${fmtMoney(paidConverted.amount)} ${CURRENCY_SYMBOL[paidCurrency]}`}
           </div>
-          <div className="lang-switcher" style={{ padding: '4px 0 2px' }}>
+          <div className="lang-switcher" style={{ padding: '4px 0 2px' }} onClick={e => e.stopPropagation()}>
             {(['month', 'year'] as const).map(p => (
               <button
                 key={p}
@@ -132,7 +154,7 @@ export function DashboardPage() {
               </button>
             ))}
           </div>
-          <div className="lang-switcher" style={{ padding: '2px 0 0' }}>
+          <div className="lang-switcher" style={{ padding: '2px 0 0' }} onClick={e => e.stopPropagation()}>
             {(['RUB', 'USD', 'EUR'] as Currency[]).map(cur => (
               <button
                 key={cur}
@@ -145,7 +167,8 @@ export function DashboardPage() {
             ))}
           </div>
         </div>
-        <div className={`stat-card ${data.overdue_invoices_count > 0 ? 'stat-card--danger' : ''}`}>
+        <div className={`stat-card stat-card--clickable ${data.overdue_invoices_count > 0 ? 'stat-card--danger' : ''}`}
+          onClick={() => navigate('/invoices?status=overdue')}>
           <div className="stat-label">{t.dashboard.overdueInvoices}</div>
           <div className="stat-value">{data.overdue_invoices_count}</div>
           <div className="stat-sub">

@@ -1057,6 +1057,15 @@ tr.row-selected td {
   border-left: 3px solid #22c55e;
 }
 
+.stat-card--clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.stat-card--clickable:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  transform: translateY(-1px);
+}
+
 .dashboard-lists {
   display: grid;
   grid-template-columns: 2fr 1fr;
