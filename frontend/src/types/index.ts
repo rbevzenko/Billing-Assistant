@@ -246,6 +246,7 @@ export interface DashboardRecentInvoice {
 export interface DashboardData {
   hours_this_week: number
   hours_this_month: number
+  hours_this_year: number
   unbilled_amount: number
   unbilled_by_currency: Partial<Record<Currency, number>>
   unpaid_amount: number
