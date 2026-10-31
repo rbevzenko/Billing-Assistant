@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { invoicesService } from '@/services/invoices'
 import { clientsService } from '@/services/clients'
 import { projectsService } from '@/services/projects'
@@ -38,10 +38,12 @@ export function InvoicesPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
 
+  const [searchParams] = useSearchParams()
+
   const [filterClient, setFilterClient] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterDateFrom, setFilterDateFrom] = useState('')
-  const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') ?? '')
+  const [filterDateFrom, setFilterDateFrom] = useState(() => searchParams.get('date_from') ?? '')
+  const [filterDateTo, setFilterDateTo] = useState(() => searchParams.get('date_to') ?? '')
 
   const [showCreate, setShowCreate] = useState(false)
   const [invoiceType, setInvoiceType] = useState<InvoiceType>('standard')
