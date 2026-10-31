@@ -87,6 +87,11 @@ export function DashboardPage() {
           <div className="stat-value">{fmt(data.hours_this_month)}</div>
           <div className="stat-sub">{t.dashboard.currentMonth}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">{t.dashboard.hoursYear}</div>
+          <div className="stat-value">{fmt(data.hours_this_year)}</div>
+          <div className="stat-sub">{t.dashboard.currentYear}</div>
+        </div>
         <div className="stat-card stat-card--warning">
           <div className="stat-label">{t.dashboard.unbilled}</div>
           <div className="stat-value stat-value--sm">

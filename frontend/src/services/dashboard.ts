@@ -57,6 +57,12 @@ export const dashboardService = {
       .filter(e => e.date >= month.from && e.date <= month.to)
       .reduce((s, e) => s + parseFloat(e.duration_hours), 0)
 
+    const yearStart = `${new Date().getFullYear()}-01-01`
+    const yearEnd = `${new Date().getFullYear()}-12-31`
+    const hours_this_year = allEntries
+      .filter(e => e.date >= yearStart && e.date <= yearEnd)
+      .reduce((s, e) => s + parseFloat(e.duration_hours), 0)
+
     const unbilled_by_currency: Partial<Record<Currency, number>> = {}
     const unbilled_amount = allEntries
       .filter(e => e.status === 'confirmed')
@@ -76,9 +82,6 @@ export const dashboardService = {
     const overdue_invoices_count = allInvoices.filter(
       inv => inv.due_date < today && inv.status !== 'paid'
     ).length
-
-    const yearStart = `${new Date().getFullYear()}-01-01`
-    const yearEnd = `${new Date().getFullYear()}-12-31`
 
     const paid_this_month_by_currency: Partial<Record<Currency, number>> = {}
     const paid_this_year_by_currency: Partial<Record<Currency, number>> = {}
@@ -137,6 +140,7 @@ export const dashboardService = {
     return {
       hours_this_week,
       hours_this_month,
+      hours_this_year,
       unbilled_amount,
       unbilled_by_currency,
       unpaid_amount,
